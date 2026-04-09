@@ -21,7 +21,8 @@ public class IntroducedInvestorController {
     private final IntroducedInvestorRegistrationService registrationService;
 
     /**
-     * Step 0: Initiate registration with plain Dataverse {@code ss_name} or Laravel-encrypted token
+     * Step 0: Initiate registration with plain Dataverse {@code ss_name} or
+     * Laravel-encrypted token
      * (same as Laravel {@code introduce-investor1/{Crypt::encrypt(introduce_id)}}).
      * <p>
      * GET /api/investor/introduced/initiate?investorRef=&lt;encrypted-or-plain&gt;
@@ -89,5 +90,16 @@ public class IntroducedInvestorController {
             @RequestParam String uniqueCode) {
         log.info("📥 Resend OTP for uniqueCode: {}", uniqueCode);
         return ResponseEntity.ok(registrationService.resendOtp(uniqueCode));
+    }
+
+    /**
+     * Get session prefill data for Step1 form
+     * GET /api/investor/introduced/session/{uniqueCode}
+     */
+    @GetMapping("/session/{uniqueCode}")
+    public ResponseEntity<IntroducedInvestorDetailsDto> getSessionPrefill(
+            @PathVariable String uniqueCode) {
+        log.info("📥 Get session prefill for uniqueCode: {}", uniqueCode);
+        return ResponseEntity.ok(registrationService.getSessionPrefill(uniqueCode));
     }
 }

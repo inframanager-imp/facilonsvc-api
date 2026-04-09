@@ -34,7 +34,8 @@ import java.util.Random;
 
 /**
  * Service for Introduced Investor Registration Flow
- * Matches Laravel: introduce-multiple-register-main-step → consent → step1 → step2 → step4 → B2C creation
+ * Matches Laravel: introduce-multiple-register-main-step → consent → step1 →
+ * step2 → step4 → B2C creation
  */
 @Service
 @Slf4j
@@ -64,7 +65,9 @@ public class IntroducedInvestorRegistrationService {
     private String clientUrl;
 
     /**
-     * Resolves URL segment from Laravel {@code introduce-investor1/{Crypt::encrypt(introduce_id)}} or plain {@code ss_name}.
+     * Resolves URL segment from Laravel
+     * {@code introduce-investor1/{Crypt::encrypt(introduce_id)}} or plain
+     * {@code ss_name}.
      */
     public String resolveInvestorReference(String investorRef, String dataverseInvestorId) {
         String raw = null;
@@ -89,16 +92,16 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public IntroducedInvestorDetailsDto initiateRegistration(String dataverseInvestorId) {
         Tenant tenant = TenantContextHolder.getContext().getTenant();
-        
+
         log.info("🔍 Initiating introduced investor registration for Dataverse ID: {}", dataverseInvestorId);
-        
+
         // Fetch investor data from Dataverse
         Map<String, Object> dataverseInvestor = dynamicsCrmService.fetchInvestorFromDataverse(dataverseInvestorId);
-        
+
         if (dataverseInvestor == null || dataverseInvestor.isEmpty()) {
             throw new IllegalArgumentException("Investor not found in Dataverse: " + dataverseInvestorId);
         }
-        
+
         // Extract details
         String investorGuid = (String) dataverseInvestor.get("ss_investorid");
         String introEmail = (String) dataverseInvestor.get("ss_emailintroduceind");
@@ -111,30 +114,33 @@ public class IntroducedInvestorRegistrationService {
         String ssBrokerValue = (String) dataverseInvestor.get("_ss_nameofportfoliomanager_value");
         String brokerPreferredBank = (String) dataverseInvestor.get("_ss_brokerpreferredbank_value");
         String investRouteValue = (String) dataverseInvestor.get("_ss_investorroute_value");
-        
+
         // Handle option set fields (can be Integer or String)
-        String serviceProviderType = dataverseInvestor.get("ss_serviceprovidertype") != null 
-            ? String.valueOf(dataverseInvestor.get("ss_serviceprovidertype")) : null;
-        String ssIpRecords = dataverseInvestor.get("ss_iprecords") != null 
-            ? String.valueOf(dataverseInvestor.get("ss_iprecords")) : null;
-        String ssApplicableToSlt = dataverseInvestor.get("ss_applicabletoslt") != null 
-            ? String.valueOf(dataverseInvestor.get("ss_applicabletoslt")) : null;
-        
+        String serviceProviderType = dataverseInvestor.get("ss_serviceprovidertype") != null
+                ? String.valueOf(dataverseInvestor.get("ss_serviceprovidertype"))
+                : null;
+        String ssIpRecords = dataverseInvestor.get("ss_iprecords") != null
+                ? String.valueOf(dataverseInvestor.get("ss_iprecords"))
+                : null;
+        String ssApplicableToSlt = dataverseInvestor.get("ss_applicabletoslt") != null
+                ? String.valueOf(dataverseInvestor.get("ss_applicabletoslt"))
+                : null;
+
         String ssInvestorTypeValue = (String) dataverseInvestor.get("_ss_investortype_value");
         String ssProductValue = (String) dataverseInvestor.get("_ss_product_value");
         String ssBrokeragePlanValue = (String) dataverseInvestor.get("_ss_portfoliomanagerplan_value");
         String ssSchemeValue = (String) dataverseInvestor.get("_ss_scheme_value");
         String ssCountryOfResidenceValue = (String) dataverseInvestor.get("_ss_countryofresidence_value");
-        
+
         // Check if email already exists
         Optional<AuthorizedUser> existingUser = authorizedUserRepository.findByEmailId(introEmail);
         boolean emailExists = existingUser.isPresent();
-        
+
         // Create or update intro_investor_temp
         IntroInvestorTemp introInvestor = introInvestorTempRepository
                 .findByIntroDvInvestorSsId(introDvInvestorSsId)
                 .orElse(new IntroInvestorTemp());
-        
+
         introInvestor.setIntroFirstName(introFirstName);
         introInvestor.setIntroMiddleName(introMiddleName);
         introInvestor.setIntroLastName(introLastName);
@@ -155,21 +161,24 @@ public class IntroducedInvestorRegistrationService {
         introInvestor.setIntroSchemeName(ssSchemeValue);
         introInvestor.setIntroCountryOfResidence(ssCountryOfResidenceValue);
         introInvestor.setTenant(tenant);
-        
+
         introInvestor = introInvestorTempRepository.save(introInvestor);
-        
+
         // Fetch display names
         String brokerName = dynamicsCrmService.fetchBrokerName(ssBrokerValue);
         String productName = dynamicsCrmService.fetchProductName(ssProductValue).orElse(null);
-        String planName = ssBrokeragePlanValue != null ? dynamicsCrmService.fetchPlanName(ssBrokeragePlanValue).orElse(null) : null;
+        String planName = ssBrokeragePlanValue != null
+                ? dynamicsCrmService.fetchPlanName(ssBrokeragePlanValue).orElse(null)
+                : null;
         String schemeName = ssSchemeValue != null ? dynamicsCrmService.fetchSchemeName(ssSchemeValue) : null;
         String nationalityName = dynamicsCrmService.fetchNationalityName(introDvNationality);
-        String countryOfResidenceName = ssCountryOfResidenceValue != null ? 
-            dynamicsCrmService.fetchCountryOfResidenceName(ssCountryOfResidenceValue) : null;
+        String countryOfResidenceName = ssCountryOfResidenceValue != null
+                ? dynamicsCrmService.fetchCountryOfResidenceName(ssCountryOfResidenceValue)
+                : null;
         String investorTypeName = dynamicsCrmService.fetchInvestorTypeName(ssInvestorTypeValue);
-        
+
         log.info("✅ Introduced investor details fetched: email={}, exists={}", introEmail, emailExists);
-        
+
         return IntroducedInvestorDetailsDto.builder()
                 .dataverseInvestorId(introDvInvestorSsId)
                 .email(introEmail)
@@ -196,14 +205,14 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public ApiResponseDto recordConsent(String dataverseInvestorId) {
         Tenant tenant = TenantContextHolder.getContext().getTenant();
-        
+
         IntroInvestorTemp introInvestor = introInvestorTempRepository
                 .findByIntroDvInvestorSsId(dataverseInvestorId)
                 .orElseThrow(() -> new IllegalArgumentException("Investor not found"));
-        
+
         // Generate unique code
         String uniqueCode = generateUniqueCode();
-        
+
         // Create session
         IntroducedRegistrationSession session = IntroducedRegistrationSession.builder()
                 .uniqueCode(uniqueCode)
@@ -218,17 +227,40 @@ public class IntroducedInvestorRegistrationService {
                 .registrationCompleted(false)
                 .expiresAt(LocalDateTime.now().plusHours(24))
                 .build();
-        
+
         session.setTenant(tenant);
         session = sessionRepository.save(session);
-        
+
         log.info("✅ Consent recorded for Dataverse ID: {}, uniqueCode: {}", dataverseInvestorId, uniqueCode);
-        
+
         return ApiResponseDto.builder()
                 .success(true)
                 .message("Consent recorded successfully")
                 .uniqueCode(uniqueCode)
                 .nextStep("step1")
+                .build();
+    }
+
+    /**
+     * Get session prefill data for Step1 form.
+     * Returns email, firstName, lastName etc. from the session +
+     * intro_investor_temp.
+     */
+    public IntroducedInvestorDetailsDto getSessionPrefill(String uniqueCode) {
+        IntroducedRegistrationSession session = getSession(uniqueCode);
+
+        IntroInvestorTemp introInvestor = introInvestorTempRepository
+                .findByIntroDvInvestorSsId(session.getDataverseInvestorId())
+                .orElse(null);
+
+        return IntroducedInvestorDetailsDto.builder()
+                .uniqueCode(uniqueCode)
+                .dataverseInvestorId(session.getDataverseInvestorId())
+                .email(session.getEmail())
+                .firstName(introInvestor != null ? introInvestor.getIntroFirstName() : session.getFirstName())
+                .middleName(introInvestor != null ? introInvestor.getIntroMiddleName() : session.getMiddleName())
+                .lastName(introInvestor != null ? introInvestor.getIntroLastName() : session.getLastName())
+                .mobile(introInvestor != null ? introInvestor.getIntroMobile() : session.getMobileNumber())
                 .build();
     }
 
@@ -239,11 +271,11 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public ApiResponseDto submitStep1AndSendOtp(Step1RequestDto dto) {
         IntroducedRegistrationSession session = getSession(dto.getUniqueCode());
-        
+
         if (!session.getConsentGiven()) {
             throw new IllegalArgumentException("Please provide consent first");
         }
-        
+
         // Update session with personal details
         session.setFirstName(dto.getFirstName());
         session.setMiddleName(dto.getMiddleName());
@@ -254,10 +286,10 @@ public class IntroducedInvestorRegistrationService {
         session.setCountryCode(dto.getCountryCode());
         session.setCurrentStep(2);
         sessionRepository.save(session);
-        
+
         // Generate OTP
         String emailOtp = generateOtp();
-        
+
         // Store OTP
         OtpVerification otp = otpVerificationRepository.findByUniqueCode(dto.getUniqueCode())
                 .orElse(new OtpVerification());
@@ -268,7 +300,7 @@ public class IntroducedInvestorRegistrationService {
         otp.setVerified(false);
         otp.setAttempts(0);
         otpVerificationRepository.save(otp);
-        
+
         // Send OTP email
         GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
         boolean emailSent = false;
@@ -280,12 +312,13 @@ public class IntroducedInvestorRegistrationService {
                 log.error("Failed to send email OTP: {}", e.getMessage());
             }
         }
-        
+
         log.info("✅ Step1 submitted and OTP sent for uniqueCode: {}", dto.getUniqueCode());
-        
+
         return ApiResponseDto.builder()
                 .success(true)
-                .message("An email with a One-Time Password has been sent to your email address. This OTP is valid for 10 minutes.")
+                .message(
+                        "An email with a One-Time Password has been sent to your email address. This OTP is valid for 10 minutes.")
                 .uniqueCode(dto.getUniqueCode())
                 .nextStep("step2")
                 .build();
@@ -298,27 +331,27 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public ApiResponseDto verifyOtp(Step2OtpVerificationDto dto) {
         IntroducedRegistrationSession session = getSession(dto.getUniqueCode());
-        
+
         OtpVerification otp = otpVerificationRepository.findByUniqueCode(dto.getUniqueCode())
                 .orElseThrow(() -> new IllegalArgumentException("OTP not found"));
-        
+
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("OTP has expired. Please request a new OTP.");
         }
-        
+
         if (!otp.getEmailOtp().equals(dto.getEmailOtp())) {
             throw new IllegalArgumentException("Invalid email OTP");
         }
-        
+
         otp.setVerified(true);
         otpVerificationRepository.save(otp);
-        
+
         session.setEmailOtpVerified(true);
         session.setCurrentStep(3);
         sessionRepository.save(session);
-        
+
         log.info("✅ OTP verified for uniqueCode: {}", dto.getUniqueCode());
-        
+
         return ApiResponseDto.builder()
                 .success(true)
                 .message("OTP verified successfully")
@@ -334,28 +367,28 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public ApiResponseDto completeRegistration(Step4CompletionDto dto) {
         IntroducedRegistrationSession session = getSession(dto.getUniqueCode());
-        
+
         if (!session.getEmailOtpVerified()) {
             throw new IllegalArgumentException("Please verify OTP first");
         }
-        
+
         if (session.getRegistrationCompleted()) {
             throw new IllegalArgumentException("Registration already completed");
         }
-        
+
         Tenant tenant = TenantContextHolder.getContext().getTenant();
-        
+
         // Fetch intro_investor_temp data
         IntroInvestorTemp introInvestor = introInvestorTempRepository
                 .findByIntroDvInvestorSsId(session.getDataverseInvestorId())
                 .orElseThrow(() -> new IllegalArgumentException("Introduced investor data not found"));
-        
+
         // Fetch contact ID from Dataverse
         String contactId = dynamicsCrmService.fetchContactIdFromDataverse(session.getDataverseInvestorGuid());
-        
+
         // Generate password (Invest@1234)
         String password = DEFAULT_PASSWORD;
-        
+
         // Create authorized user
         AuthorizedUser user = AuthorizedUser.builder()
                 .firstName(session.getFirstName())
@@ -372,7 +405,7 @@ public class IntroducedInvestorRegistrationService {
                 .build();
         user.setTenant(tenant);
         user = authorizedUserRepository.save(user);
-        
+
         // Create investor record
         Investor investor = Investor.builder()
                 .authorizedUser(user)
@@ -391,46 +424,47 @@ public class IntroducedInvestorRegistrationService {
                 .countryOfResidence(parseCountryOfResidence(dto.getCountryOfResidence()))
                 .whatsappConsent(dto.getAgreeForWhatsapp() != null && dto.getAgreeForWhatsapp() ? 1 : 0)
                 .entityName(dto.getEntityName())
-                .entityNameRepresentative(dto.getEntityName() != null ? 
-                    session.getFirstName() + " " + session.getLastName() : null)
+                .entityNameRepresentative(
+                        dto.getEntityName() != null ? session.getFirstName() + " " + session.getLastName() : null)
                 .companyCapacity(dto.getRepresentativeCapacity())
                 .securityRegulated(dto.getSecurityRegulated())
                 .build();
         investor.setTenant(tenant);
         investor = investorRepository.save(investor);
-        
+
         // Save investor consents to investor_consents table
         saveInvestorConsents(dto.getUniqueCode(), session, dto, investor.getId(), tenant);
-        
+
         // Update intro_investor_temp with unique_code
         introInvestor.setUniqueCodeDb(dto.getUniqueCode());
         introInvestorTempRepository.save(introInvestor);
-        
+
         // **CRITICAL: Create B2C Account**
-        boolean b2cAccountCreated = createB2CAccount(user, password, session.getFirstName() + " " + session.getLastName());
-        
+        boolean b2cAccountCreated = createB2CAccount(user, password,
+                session.getFirstName() + " " + session.getLastName());
+
         // Send registration credentials email ONLY if B2C account created
         if (b2cAccountCreated) {
-            sendRegistrationCredentialsEmail(session.getEmail(), 
-                session.getFirstName() + " " + session.getLastName(), password);
+            sendRegistrationCredentialsEmail(session.getEmail(),
+                    session.getFirstName() + " " + session.getLastName(), password);
         } else {
             log.warn("⚠️ Registration credentials email NOT sent because B2C account creation failed");
         }
-        
+
         // Mark session as completed
         session.setRegistrationCompleted(true);
         session.setCompletedAt(LocalDateTime.now());
         session.setCurrentStep(5);
         sessionRepository.save(session);
-        
-        log.info("✅ Introduced investor registration completed: uniqueCode={}, email={}, B2C={}", 
-                 dto.getUniqueCode(), session.getEmail(), b2cAccountCreated ? "✓" : "✗");
-        
+
+        log.info("✅ Introduced investor registration completed: uniqueCode={}, email={}, B2C={}",
+                dto.getUniqueCode(), session.getEmail(), b2cAccountCreated ? "✓" : "✗");
+
         return ApiResponseDto.builder()
                 .success(true)
-                .message(b2cAccountCreated 
-                    ? "Registration completed successfully! Login credentials have been sent to your email." 
-                    : "Registration completed, but there was an issue creating your login account. Please contact support.")
+                .message(b2cAccountCreated
+                        ? "Registration completed successfully! Login credentials have been sent to your email."
+                        : "Registration completed, but there was an issue creating your login account. Please contact support.")
                 .uniqueCode(dto.getUniqueCode())
                 .investorId(investor.getId())
                 .b2cAccountCreated(b2cAccountCreated)
@@ -443,14 +477,14 @@ public class IntroducedInvestorRegistrationService {
     @Transactional
     public ApiResponseDto resendOtp(String uniqueCode) {
         IntroducedRegistrationSession session = getSession(uniqueCode);
-        
+
         if (session.getEmailOtpVerified()) {
             throw new IllegalArgumentException("OTP already verified");
         }
-        
+
         // Generate new OTP
         String emailOtp = generateOtp();
-        
+
         // Update OTP
         OtpVerification otp = otpVerificationRepository.findByUniqueCode(uniqueCode)
                 .orElse(new OtpVerification());
@@ -459,7 +493,7 @@ public class IntroducedInvestorRegistrationService {
         otp.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otp.setVerified(false);
         otpVerificationRepository.save(otp);
-        
+
         // Send OTP email
         GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
         boolean sent = false;
@@ -471,7 +505,7 @@ public class IntroducedInvestorRegistrationService {
                 log.error("Failed to resend OTP: {}", e.getMessage());
             }
         }
-        
+
         return ApiResponseDto.builder()
                 .success(true)
                 .message("OTP has been resent to your email")
@@ -498,16 +532,16 @@ public class IntroducedInvestorRegistrationService {
                 log.error("❌ Azure B2C configuration not found. B2C account NOT created.");
                 return false;
             }
-            
+
             String tenantIdentifier;
             if (b2cConfig.getB2cTenantId() != null && !b2cConfig.getB2cTenantId().isEmpty()) {
                 tenantIdentifier = b2cConfig.getB2cTenantId();
             } else {
                 tenantIdentifier = b2cConfig.getB2cTenantName() + ".onmicrosoft.com";
             }
-            
+
             log.info("🔐 Creating Azure B2C user with tenant: {}", tenantIdentifier);
-            
+
             SignUpDto signUpDto = SignUpDto.builder()
                     .email(user.getEmailId())
                     .password(password)
@@ -520,24 +554,24 @@ public class IntroducedInvestorRegistrationService {
                     .tenantId(tenantIdentifier)
                     .issuer("facilonservices.onmicrosoft.com")
                     .build();
-            
+
             MicrosoftGraphResponseDto response = userMgmtClient.createUserLatest(signUpDto);
-            
+
             if (response != null && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
-                log.info("✅ B2C account created successfully for: {}, Azure ID: {}", 
+                log.info("✅ B2C account created successfully for: {}, Azure ID: {}",
                         user.getEmailId(), response.getId());
-                
+
                 user.setAzureAdUserId(response.getId());
                 authorizedUserRepository.save(user);
-                
+
                 return true;
             } else {
-                log.error("❌ Azure B2C account creation failed for {}: {}", 
+                log.error("❌ Azure B2C account creation failed for {}: {}",
                         user.getEmailId(), response != null ? response.getErrorMsg() : "null response");
                 return false;
             }
         } catch (Exception e) {
-            log.error("❌ Azure B2C account creation failed with exception for {}: {}", 
+            log.error("❌ Azure B2C account creation failed with exception for {}: {}",
                     user.getEmailId(), e.getMessage(), e);
             return false;
         }
@@ -549,7 +583,7 @@ public class IntroducedInvestorRegistrationService {
             try {
                 boolean sent = graphEmailService.sendLoginDetailsEmail(
                         email, investorName, email, password, clientUrl);
-                
+
                 if (sent) {
                     log.info("📧 Registration credentials email sent to {}", email);
                 } else {
@@ -573,11 +607,11 @@ public class IntroducedInvestorRegistrationService {
     }
 
     private String generateUniqueCode() {
-        String code = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) 
-                    + (1000 + RANDOM.nextInt(9000));
-        while (sessionRepository.findByUniqueCode(code).isPresent()) {
-            code = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) 
+        String code = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                 + (1000 + RANDOM.nextInt(9000));
+        while (sessionRepository.findByUniqueCode(code).isPresent()) {
+            code = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+                    + (1000 + RANDOM.nextInt(9000));
         }
         return code;
     }
@@ -587,7 +621,8 @@ public class IntroducedInvestorRegistrationService {
     }
 
     private String getServiceProviderTypeName(String type) {
-        if (type == null) return "";
+        if (type == null)
+            return "";
         return switch (type) {
             case "100000000" -> "Broker";
             case "100000001" -> "Bank";
@@ -597,7 +632,7 @@ public class IntroducedInvestorRegistrationService {
             default -> "Service Provider";
         };
     }
-    
+
     /**
      * Parse nationality GUID to Integer ID from master_nationality table
      */
@@ -615,9 +650,10 @@ public class IntroducedInvestorRegistrationService {
             return null;
         }
     }
-    
+
     /**
-     * Parse country of residence GUID to Integer ID from master_country_of_residence table
+     * Parse country of residence GUID to Integer ID from
+     * master_country_of_residence table
      */
     private Integer parseCountryOfResidence(String countryGuid) {
         if (countryGuid == null || countryGuid.isBlank()) {
@@ -633,12 +669,12 @@ public class IntroducedInvestorRegistrationService {
             return null;
         }
     }
-    
+
     /**
      * Save investor consents to investor_consents table for Consent Centre
      */
-    private void saveInvestorConsents(String uniqueCode, IntroducedRegistrationSession session, 
-                                     Step4CompletionDto dto, Long investorId, Tenant tenant) {
+    private void saveInvestorConsents(String uniqueCode, IntroducedRegistrationSession session,
+            Step4CompletionDto dto, Long investorId, Tenant tenant) {
         try {
             InvestorConsents consents = InvestorConsents.builder()
                     .investorUniqueId(uniqueCode)
