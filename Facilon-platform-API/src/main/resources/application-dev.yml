@@ -28,7 +28,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: update  # Hibernate schema generation strategy (e.g., update, create-drop)
+      ddl-auto: validate  # Hibernate schema generation strategy (e.g., update, create-drop)
   liquibase:
     enabled: false
     change-log: classpath:/db/db.changelog-master.xml
