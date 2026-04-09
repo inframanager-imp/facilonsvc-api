@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family: Arial, sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:20px 0;">
+        <tr>
+            <td align="center">
+
+                <table width="600" cellpadding="0" cellspacing="0" 
+                       style="background:#ffffff; padding:30px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+
+                   
+                    <!-- Greeting -->
+                    <tr>
+                        <td style="padding-bottom:15px; font-size:14px; color:#333;">
+                            Dear <strong>{{serviceProviderName}}</strong>,
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding-bottom:15px; font-size:14px; color:#555; line-height:1.6;">
+                            We would like to inform you that 
+                            <strong>{{investorName}}</strong> has dispatched the required 
+                            physical documents to your office as part of the onboarding 
+                            process initiated through the Facilon platform.
+                        </td>
+                    </tr>
+
+                    <!-- Courier Details Box -->
+                    <tr>
+                        <td style="padding:18px 0 10px 0; font-size:14px; color:#444;">
+                            <strong style="font-size:15px;">Courier Details</strong>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="background:#fafbfc; padding:18px 20px; border-radius:6px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13.5px; color:#555;">
+                                
+                                <tr>
+                                    <td style="padding:6px 0; width:40%; color:#777;">Investor Name</td>
+                                    <td style="padding:6px 0; font-weight:500;">{{investorName}}</td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding:6px 0; color:#777;">Entity Type</td>
+                                    <td style="padding:6px 0;">{{entityType}}</td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding:6px 0; color:#777;">Courier Partner</td>
+                                    <td style="padding:6px 0;">{{courierName}}</td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding:6px 0; color:#777;">AWB Number</td>
+                                    <td style="padding:6px 0;">{{awbNumber}}</td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding:6px 0; color:#777;">Date of Dispatch</td>
+                                    <td style="padding:6px 0;">{{dispatchDate}}</td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Instructions -->
+                    <tr>
+                        <td style="padding-top:20px; font-size:14px; color:#555; line-height:1.6;">
+                            We kindly request you to:
+                            <ol style="padding-left:18px; margin-top:10px;">
+                                <li>Confirm receipt of the documents upon delivery.</li>
+                                <li>Notify the Investor if any deficiencies are identified.</li>
+                                <li>Update the onboarding status on the Facilon dashboard after verification.</li>
+                            </ol>
+                        </td>
+                    </tr>
+
+                    <!-- Support -->
+                    <tr>
+                        <td style="padding-top:15px; font-size:14px; color:#555;">
+                            For any assistance, please contact us at 
+                            <a href="mailto:support@facilonservices.com" 
+                               style="color:#1a73e8; text-decoration:none;">
+                                support@facilonservices.com
+                            </a>
+                        </td>
+                    </tr>
+
+                    <!-- Closing -->
+                    <tr>
+                        <td style="padding-top:25px; font-size:14px; color:#333;">
+                            Warm regards,<br><br>
+                            <strong>Facilon Operations Team</strong><br>
+                            Facilon Services Pvt. Ltd
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- Tenant B2C Config -->
+    <changeSet id="tenant-config-1" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_b2c_config (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                enabled TINYINT(1) DEFAULT 1,
+                b2c_tenant_name VARCHAR(256) NOT NULL,
+                b2c_tenant_id VARCHAR(256),
+                client_id VARCHAR(256) NOT NULL,
+                client_secret TEXT NOT NULL,
+                signup_signin_policy VARCHAR(256) NOT NULL,
+                logout_policy VARCHAR(256) NOT NULL,
+                redirect_uri VARCHAR(512) NOT NULL,
+                post_logout_redirect_uri VARCHAR(512) NOT NULL,
+                scope VARCHAR(512) DEFAULT 'openid profile email offline_access',
+                created_by VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_tenant_b2c_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id) ON DELETE CASCADE,
+                CONSTRAINT uk_tenant_b2c_config UNIQUE (tenant_id)
+            );
+            CREATE INDEX idx_tenant_b2c_tenant_id ON tenant_b2c_config(tenant_id);
+        </sql>
+    </changeSet>
+
+    <changeSet id="tenant-config-1b-add-reset-password-policy" author="facilon">
+        <addColumn tableName="tenant_b2c_config">
+            <column name="reset_password_policy" type="VARCHAR(256)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="authorized-user-add-google-user-id" author="facilon">
+        <addColumn tableName="authorized_user">
+            <column name="google_user_id" type="VARCHAR(256)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Tenant Graph Email Config -->
+    <changeSet id="tenant-config-2" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_graph_email_config (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                enabled TINYINT(1) DEFAULT 1,
+                tenant_id_azure VARCHAR(256) NOT NULL,
+                client_id VARCHAR(256) NOT NULL,
+                client_secret TEXT NOT NULL,
+                sender_email VARCHAR(256) NOT NULL,
+                sender_name VARCHAR(256) DEFAULT 'Facilon Platform',
+                max_retries INT DEFAULT 3,
+                retry_delay_ms BIGINT DEFAULT 1000,
+                connection_timeout INT DEFAULT 30000,
+                read_timeout INT DEFAULT 30000,
+                debug_mode TINYINT(1) DEFAULT 0,
+                created_by VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_tenant_graph_email_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id) ON DELETE CASCADE,
+                CONSTRAINT uk_tenant_graph_email_config UNIQUE (tenant_id)
+            );
+            CREATE INDEX idx_tenant_graph_email_tenant_id ON tenant_graph_email_config(tenant_id);
+        </sql>
+    </changeSet>
+
+    <!-- Tenant SharePoint Config -->
+    <changeSet id="tenant-config-3" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_sharepoint_config (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                enabled TINYINT(1) DEFAULT 0,
+                site_hostname VARCHAR(512),
+                site_path VARCHAR(512) DEFAULT '/sites/FacilonInvestor',
+                document_library VARCHAR(256),
+                tenant_id_azure VARCHAR(256),
+                client_id VARCHAR(256),
+                client_secret TEXT,
+                created_by VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_tenant_sharepoint_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id) ON DELETE CASCADE,
+                CONSTRAINT uk_tenant_sharepoint_config UNIQUE (tenant_id)
+            );
+            CREATE INDEX idx_tenant_sharepoint_tenant_id ON tenant_sharepoint_config(tenant_id);
+        </sql>
+    </changeSet>
+
+    <!-- Tenant Dynamics Config -->
+    <changeSet id="tenant-config-4" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant_dynamics_config (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                enabled TINYINT(1) DEFAULT 0,
+                tenant_id_azure VARCHAR(256),
+                client_id VARCHAR(256),
+                client_secret TEXT,
+                resource VARCHAR(512),
+                created_by VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_tenant_dynamics_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id) ON DELETE CASCADE,
+                CONSTRAINT uk_tenant_dynamics_config UNIQUE (tenant_id)
+            );
+            CREATE INDEX idx_tenant_dynamics_tenant_id ON tenant_dynamics_config(tenant_id);
+        </sql>
+    </changeSet>
+
+    <!-- Seed default tenant configs from YAML values -->
+    <changeSet id="tenant-config-5-seed" author="facilon">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM tenant_b2c_config WHERE tenant_id = 1</sqlCheck>
+        </preConditions>
+        <sql>
+            INSERT INTO tenant_b2c_config (tenant_id, enabled, b2c_tenant_name, b2c_tenant_id, client_id, client_secret,
+                signup_signin_policy, logout_policy, redirect_uri, post_logout_redirect_uri, scope, created_by)
+            VALUES (1, 1, 'facilonservices', '', '54e55d9e-551a-4db4-b1e1-92fdb3e38c01', 'PLACEHOLDER_UPDATE_VIA_ADMIN_API',
+                'B2C_1_2Signin', 'B2C_1_2Signin', 'http://localhost:3000/login/callback', 'http://localhost:3000',
+                'openid profile email offline_access', 'system');
+        </sql>
+        <rollback>
+            DELETE FROM tenant_b2c_config WHERE tenant_id = 1;
+        </rollback>
+    </changeSet>
+
+    <changeSet id="tenant-config-6-seed-graph" author="facilon">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM tenant_graph_email_config WHERE tenant_id = 1</sqlCheck>
+        </preConditions>
+        <sql>
+            INSERT INTO tenant_graph_email_config (tenant_id, enabled, tenant_id_azure, client_id, client_secret,
+                sender_email, sender_name, max_retries, retry_delay_ms, connection_timeout, read_timeout, debug_mode, created_by)
+            VALUES (1, 1, '82bfe941-8424-460e-b024-540394d1a92e', '3eb83171-58a2-4841-a565-b9f8d4a280e8',
+                'SOW8Q~q~EN83ohcPnXVfdHnc12UuWkMu2JkCBcAK', 'no-reply@facilonservices.com', 'Facilon Platform',
+                3, 1000, 30000, 30000, 0, 'system');
+        </sql>
+        <rollback>
+            DELETE FROM tenant_graph_email_config WHERE tenant_id = 1;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,34 @@
+package com.facilon.app.module.client.model.master;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Master title/salutation list (Mr., Mrs., Dr., etc.).
+ * Global reference data.
+ */
+@Entity
+@Table(name = "master_title")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MasterTitle {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "my_row_id")
+    private Long myRowId;
+
+    @Column(name = "id", nullable = false)
+    private Integer id;
+
+    @Column(name = "ss_name", columnDefinition = "TEXT")
+    private String ssName;
+
+    @Column(name = "ss_titleid", columnDefinition = "TEXT")
+    private String ssTitleId;
+}

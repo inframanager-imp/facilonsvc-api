@@ -1,0 +1,149 @@
+server:
+  port: 8082                 # Port on which the Spring Boot application will run
+  servlet:
+    context-path: /facilon # Context path for the application endpoints
+
+client:
+  port: 3000
+  host: localhost
+
+
+app:
+  cors_origins_url: http://${client.host}:${client.port}
+  client_url: http://${client.host}:${client.port}
+  security:
+    jwtTokenExpirationInMills: 604800000
+    jwtSecret: k2SId+qxOCWNmeptM4Y0hK7ncitTcB+zMXa50pe5Ldc=
+    maxLoginFailureCount: 3
+    passwordExpiryInDays: 30
+    passwordExpiryInDays1: 40
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/facilon?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    enable: true
+    require-ssl: false
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update  # Hibernate schema generation strategy (e.g., update, create-drop)
+  liquibase:
+    enabled: false
+    change-log: classpath:/db/db.changelog-master.xml
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+management:
+  endpoint:
+    health:
+      enabled: true       # Enable Actuator health endpoint
+  endpoints:
+    web:
+      exposure:
+        include: health  # Expose Actuator health endpoint
+
+springdoc:
+  api-docs:
+    path: /facilon-api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.myapp: DEBUG
+  file:
+    name: app.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %level - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Azure B2C, SharePoint, Dynamics, Graph Email - now stored in DB (tenant_b2c_config, tenant_graph_email_config, etc.)
+# Use Admin API: PUT /api/admin/tenants/{tenantId}/b2c-config to configure
+
+integration:
+  user-mgmt:
+    enabled: true
+    url: ${USER_MGMT_SERVICE_URL:http://localhost:9090}
+  email:
+    enabled: false
+    url: ${EMAIL_SERVICE_URL:http://localhost:8080}
+  sms:
+    enabled: false
+    url: ${SMS_API_URL:}
+    auth-header: ${SMS_AUTH_HEADER:}
+    sender-id: ${SMS_SENDER_ID:FACILN}
+
+# Graph Email: enabled flag for bean loading; config from DB (tenant_graph_email_config)
+graph:
+  email:
+    enabled: true
+
+dataverse:
+  master-sync:
+    # Run on startup: true = sync all master tables when the server boots
+    run-on-startup: true
+    # Cron expression — default: every day at 02:00 AM
+    # Format: second minute hour day month weekday
+    # Examples:
+    #   "0 0 2 * * *"   → every day at 2 AM
+    #   "0 0 */6 * * *" → every 6 hours
+    #   "0 */30 * * * *"→ every 30 minutes (for dev/testing)
+    cron: "0 0 2 * * *"
+    # Set to false to disable the scheduled cron (startup sync still runs if run-on-startup=true)
+    cron-enabled: true
+  sharepoint:
+    parent-location-id: "112fd6a2-12f1-f011-8406-7ced8d285638"
+    site-collection-id: "43de59de-265e-f011-877b-7c1e5232a375"
+
+investor:
+  onboarding:
+    default-tenant-id: 1
+    india-country-code: 240
+    india-isd-code: 91
+    batch-default-password: "TempPass123!"
+  # Encrypted introduce links (Laravel Crypt::encrypt(introduce_id)) — set to same APP_KEY as docs/Investor .env
+  introduced:
+    laravel-app-key: base64:eo59iKgild3xZoNbSoL7GXncfj9XsFbg2j9Dr+NTEPw=
+    laravel-cipher: aes-256-cbc
+  kyc:
+    upload-dir: uploads/kyc
+
+ignored:
+  httpUrl:
+    - /api/login
+    - /swagger-ui/**
+    - /facilon-api-docs/**
+    - /swagger-ui.html
+    - /api/users/register
+    - /api/users/forgot-password
+    - /api/users/reset-password
+    - /actuator/health
+    - /api/users/checkEmail
+    - /api/admin/register
+    - /api/clients/onboarding/**
+    - /api/investor/introduced/**
+    - /api/admin/tenants/*/admin-user
+    - /api/admin/users/*/roles/*
+    - /api/azure-ad/create-user-latest
+    - /api/azure-ad/log-password-failure-count
+    - /api/clients/onboarding/**
+    - /api/clients/content/**
+    - /api/clients/introduced-investor/nextholder/docs/**
+    - /api/clients/pms-investor/nextholder/docs/**
+    - /api/auth/azure-b2c/**
+    - /api/graph-email/**
+    - /api/clients/documents/submission/**
+
+# SharePoint Document URLs
+sharepoint:
+  investor-documents:
+    base-url: "https://facilon.sharepoint.com/sites/CRM/ss_investordocuments"

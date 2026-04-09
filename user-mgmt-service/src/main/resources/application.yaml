@@ -1,0 +1,33 @@
+eureka:
+  client:
+    #    serviceUrl:
+    #    defaultZone: ${DISCOVERY_1_URL}
+    enabled: false
+  instance:
+    preferIpAddress: true
+server:
+  port: ${SERVICE_1_PORT}
+spring:
+  application:
+    name: ${SERVICE_1_NAME}
+azure:
+  issuerName: ${AZURE_AD_ISSUER_NAME}
+  forceResetPassword: ${AZURE_FORCE_RESET_PASSWORD}
+
+servicename: user-management-service
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level --- [%thread] %logger{36} : %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level --- [%thread] %logger{36} : %msg%n"
+  file:
+    name: logs/${servicename}.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: "logs/${servicename}.%d{yyyy-MM-dd}.%i.log.gz"
+      max-file-size: 20KB
+      max-history: 30
+      total-size-cap: 500MB
+  level:
+    root: WARN
+    com.azure.user_management: INFO
+    org.springframework: WARN

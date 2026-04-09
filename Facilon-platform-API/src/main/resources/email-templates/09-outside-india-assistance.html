@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistance for Non-Resident Investor</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .info-box {background-color: #e7e3fc; border-left: 4px solid #6f42c1; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .documents-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .services-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🌐 NRI/Foreign Investor Support</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>Thank you for your interest in Facilon Platform.</p>
+
+            <div class="info-box">
+                <h3>📍 We're Here to Help!</h3>
+                <p>We noticed that you are located outside India. We are here to assist you with your registration process.</p>
+            </div>
+
+            <h3>For Non-Resident Indians (NRI) and Foreign Nationals:</h3>
+
+            <div class="documents-box">
+                <h4>📄 Required Documents:</h4>
+                <ul>
+                    <li>✓ Valid Passport (all pages)</li>
+                    <li>✓ Visa/Work Permit (if applicable)</li>
+                    <li>✓ Proof of Current Residential Address</li>
+                    <li>✓ OCI Card (for Person of Indian Origin)</li>
+                    <li>✓ Recent Photograph</li>
+                    <li>✓ Bank Statements (last 3 months)</li>
+                </ul>
+            </div>
+
+            <div class="services-box">
+                <h3>🎯 Special Assistance Available:</h3>
+                
+                <h4>1. Video Verification</h4>
+                <ul>
+                    <li>Schedule a video call for document verification</li>
+                    <li>Available on weekdays 9 AM - 6 PM IST</li>
+                </ul>
+
+                <h4>2. Embassy/Consulate Verification</h4>
+                <ul>
+                    <li>We can coordinate with Indian embassy/consulate in your country</li>
+                    <li>Additional processing time: 5-7 business days</li>
+                </ul>
+
+                <h4>3. Agent-Assisted Registration</h4>
+                <ul>
+                    <li>Our authorized agents can assist with the entire process</li>
+                    <li>Available in select countries</li>
+                </ul>
+            </div>
+
+            <h3>📞 Next Steps:</h3>
+            <p>Please contact our NRI support team:</p>
+
+            <div class="info-box">
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>WhatsApp:</strong> {{supportPhone}}
+                </p>
+                <p><strong>Working Hours:</strong> Monday - Friday, 9 AM - 6 PM IST</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/help/nri-faq" class="button">NRI FAQ</a>
+                <a href="{{baseUrl}}/contact" class="button">Contact Us</a>
+            </div>
+
+            <p>We look forward to assisting you!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon NRI Support Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated email. Please reply to this email or contact us for assistance.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

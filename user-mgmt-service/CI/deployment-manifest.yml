@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: #{repository}#-#{environment}#-deployment
+  namespace: #{NAMESPACE}#
+  labels:
+    app: #{repository}#-#{environment}#
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: #{repository}#-#{environment}#
+  template:
+    metadata:
+      labels:
+        app: #{repository}#-#{environment}#
+    spec:
+      containers:
+      - name: #{repository}#-#{environment}#
+        image: #{acrrepo}#/#{repository}#-#{environment}#:#{Build.BuildId}#
+        ports:
+        - containerPort: 9091
+        envFrom:
+        - configMapRef:
+            name: #{environment}#-configmap
+        - secretRef:
+            name: #{environment}#-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: #{repository}#-#{environment}#-svc
+  namespace: #{NAMESPACE}#
+spec:
+  selector:
+    app: #{repository}#-#{environment}#
+  ports:
+    - protocol: TCP
+      port: 9091
+      targetPort: 9091
+  type: ClusterIP

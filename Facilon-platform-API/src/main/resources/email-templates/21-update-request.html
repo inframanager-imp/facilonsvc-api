@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Request - Facilon Platform</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .request-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .reason-box {background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .steps-box {background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .tips-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⚠️ Update Request</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>We need some additional information to complete your profile verification.</p>
+
+            <div class="request-box">
+                <h3>📋 Update Request Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Requested By:</strong></td>
+                        <td style="padding: 5px 0;">{{adminName}} (Verification Team)</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Priority:</strong></td>
+                        <td style="padding: 5px 0; color: #dc3545; font-weight: bold;">High</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>Information/Documents Required:</h3>
+            <div class="request-box">
+                {{requestedFields}}
+            </div>
+
+            <div class="reason-box">
+                <h3>Reason for Update:</h3>
+                <p>{{reason}}</p>
+            </div>
+
+            <div class="steps-box">
+                <h3>📝 How to Update:</h3>
+                <ol>
+                    <li>Login to your account: <a href="{{baseUrl}}/login">{{baseUrl}}/login</a></li>
+                    <li>Go to your profile: <a href="{{baseUrl}}/investor/profile">{{baseUrl}}/investor/profile</a></li>
+                    <li>Update the required information</li>
+                    <li>Upload any additional documents (if requested)</li>
+                    <li>Click "Save" to submit updates</li>
+                </ol>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{baseUrl}}/login" class="button">Login & Update</a>
+            </div>
+
+            <div class="reason-box">
+                <h4>⚠️ Action Required: Please update within 7 days</h4>
+            </div>
+
+            <div class="request-box">
+                <h3>Common Reasons for Update Requests:</h3>
+                <ul>
+                    <li>✓ Document quality issues (blurred, partial, etc.)</li>
+                    <li>✓ Expired documents (ID, address proof, etc.)</li>
+                    <li>✓ Missing information in forms</li>
+                    <li>✓ Mismatch in information across documents</li>
+                    <li>✓ Additional compliance requirements</li>
+                </ul>
+            </div>
+
+            <div class="tips-box">
+                <h3>💡 Tips for Quick Approval:</h3>
+                <ul>
+                    <li>✓ Ensure all documents are clear and readable</li>
+                    <li>✓ Check that all pages are uploaded (if multi-page document)</li>
+                    <li>✓ Verify all information matches across documents</li>
+                    <li>✓ Use recent documents (within last 3 months for address proof)</li>
+                    <li>✓ Ensure file sizes are within limits (max 5MB per file)</li>
+                </ul>
+            </div>
+
+            <div class="steps-box">
+                <h4>💬 Need Assistance?</h4>
+                <p>If you have questions about the update request:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Reference:</strong> Include your investor code in your communication
+                </p>
+                <p>You can also chat with our support team:</p>
+                <p><a href="{{baseUrl}}/help/chat">{{baseUrl}}/help/chat</a></p>
+            </div>
+
+            <p>We're here to help you complete your verification quickly!</p>
+
+            <p>Best regards,<br>
+            <strong>{{adminName}}</strong><br>
+            Facilon Verification Team</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please do not reply to this email.<br>
+            Contact support using the details above.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+trigger:
+- none
+
+resources:
+  repositories:
+    - repository: CICDRepo  # Alias for the CICD repo
+      type: git
+      name: FS_Devops/main-cicd  # Update with your actual CICD repo name
+      ref: refs/heads/qa  # Use the qa branch of the CICD repo
+
+stages:
+  - template: java-pipeline-qa.yml@CICDRepo  # Path to centralized pipeline in CICD repo
+    parameters:
+      repository: 'user-mgmt-service'
+      deploymentFile: 'deployment-manifest.yml'

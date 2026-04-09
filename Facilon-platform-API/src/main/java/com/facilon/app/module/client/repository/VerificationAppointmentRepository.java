@@ -1,0 +1,16 @@
+package com.facilon.app.module.client.repository;
+
+import com.facilon.app.module.client.model.VerificationAppointment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface VerificationAppointmentRepository extends JpaRepository<VerificationAppointment, Long> {
+
+    List<VerificationAppointment> findByInvestorUniqueId(String investorUniqueId);
+
+    Optional<VerificationAppointment> findByInvestorUniqueIdAndStatus(String investorUniqueId, String status);
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Verification Complete</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .success-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .step-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 15px 0; border-radius: 4px;}
+        .location-box {background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 14px 35px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px; font-size: 16px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎉 Congratulations!</h1>
+            <p style="margin: 10px 0; font-size: 18px;">All Documents Verified</p>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>Congratulations! All your documents have been successfully verified.</p>
+
+            <div class="success-box">
+                <h3 style="margin-top: 0; text-align: center; font-size: 20px;">✓ All Required Documents Verified</h3>
+            </div>
+
+            <h3>What's Next?</h3>
+            <p>To complete your account activation, you need to:</p>
+
+            <div class="step-box">
+                <h4>1. Schedule an In-Person Verification Appointment</h4>
+                <p>Visit: <a href="{{baseUrl}}/investor/appointments">{{baseUrl}}/investor/appointments</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>2. Visit Our Office</h4>
+                <p>Bring your original documents for final verification</p>
+            </div>
+
+            <div class="step-box">
+                <h4>3. Account Activation</h4>
+                <p>Your account will be activated within 1-2 business days after in-person verification</p>
+            </div>
+
+            <div class="location-box">
+                <h3>📍 Office Locations:</h3>
+                <ul>
+                    <li><strong>Mumbai Office (Head Office):</strong><br>Nariman Point, Mumbai - 400021</li>
+                    <li><strong>Delhi Office:</strong><br>Connaught Place, New Delhi - 110001</li>
+                    <li><strong>Bangalore Office:</strong><br>MG Road, Bangalore - 560001</li>
+                </ul>
+                <p><strong>Office Hours:</strong> Monday - Friday, 10:00 AM - 6:00 PM</p>
+            </div>
+
+            <div class="success-box">
+                <h4>📋 Required Original Documents:</h4>
+                <ul>
+                    <li>• Original Passport</li>
+                    <li>• PAN Card (Original)</li>
+                    <li>• Address Proof</li>
+                    <li>• Passport Size Photos (2)</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{baseUrl}}/investor/appointments" class="button">Schedule Appointment</a>
+                <a href="{{baseUrl}}/investor/physical-submission" class="button">View Office Details</a>
+            </div>
+
+            <div class="location-box">
+                <h4>💬 Need Help?</h4>
+                <p>If you have any questions, please contact our support team:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}
+                </p>
+            </div>
+
+            <p>We look forward to welcoming you!</p>
+
+            <p>Best regards,<br>
+            <strong>The Facilon Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

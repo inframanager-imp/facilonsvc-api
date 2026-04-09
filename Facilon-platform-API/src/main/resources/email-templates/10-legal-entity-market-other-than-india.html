@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Registration - International Markets</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .status-box {background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .services-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .timeline-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🏢 Corporate Registration Received</h1>
+        </div>
+        <div class="content">
+            <p>Dear {{entityName}} Team,</p>
+            
+            <p>Thank you for registering your interest in <strong>{{market}}</strong> with Facilon Platform.</p>
+
+            <p>We appreciate your organization's interest and have recorded your details in our CRM system (Zoho).</p>
+
+            <div class="status-box">
+                <h3>📊 Current Status:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Legal Entity:</strong></td>
+                        <td style="padding: 5px 0;">{{entityName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Market Interest:</strong></td>
+                        <td style="padding: 5px 0;">{{market}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Recorded - Under Review</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>What Happens Next?</h3>
+
+            <p>Our international business development team has received your registration details and will:</p>
+
+            <div class="services-box">
+                <ul>
+                    <li>✓ Review your investment requirements and objectives</li>
+                    <li>✓ Assess market availability and regulatory compliance</li>
+                    <li>✓ Evaluate cross-border investment framework</li>
+                    <li>✓ Prepare customized proposal for your organization</li>
+                    <li>✓ Schedule consultation call with relationship manager</li>
+                </ul>
+            </div>
+
+            <div class="timeline-box">
+                <h4>⏱️ Timeline:</h4>
+                <ul>
+                    <li><strong>Initial review:</strong> 2-3 business days</li>
+                    <li><strong>Market assessment:</strong> 1-2 weeks</li>
+                    <li><strong>Consultation scheduling:</strong> Within 2 weeks</li>
+                    <li><strong>Update:</strong> You will receive a detailed email update</li>
+                </ul>
+            </div>
+
+            <h3>Services for International Corporate Clients:</h3>
+
+            <div class="services-box">
+                <p>We offer comprehensive services for corporate entities including:</p>
+                <ul>
+                    <li>✓ Foreign Portfolio Investor (FPI) registration</li>
+                    <li>✓ Foreign Direct Investment (FDI) advisory</li>
+                    <li>✓ Cross-border investment structuring</li>
+                    <li>✓ Tax optimization and compliance</li>
+                    <li>✓ Dedicated corporate relationship management</li>
+                    <li>✓ Legal and regulatory advisory</li>
+                    <li>✓ Multi-currency investment accounts</li>
+                </ul>
+            </div>
+
+            <h3>Alternative: India Market Investments</h3>
+            <p>If your organization is also interested in exploring investment opportunities in the Indian market, we offer:</p>
+            <ul>
+                <li>✓ Foreign corporate investor services</li>
+                <li>✓ Compliance and FEMA advisory</li>
+                <li>✓ Corporate PAN application assistance</li>
+                <li>✓ End-to-end registration support</li>
+            </ul>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/corporate-investors" class="button">Learn More</a>
+                <a href="{{baseUrl}}/corporate/schedule" class="button">Schedule Consultation</a>
+            </div>
+
+            <div class="status-box">
+                <h4>📧 Contact Our Corporate Services Team:</h4>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}
+                </p>
+                <p><strong>Corporate Services Portal:</strong> <a href="{{baseUrl}}/corporate">{{baseUrl}}/corporate</a></p>
+            </div>
+
+            <p>We look forward to partnering with <strong>{{entityName}}</strong> for your investment needs!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Corporate Services Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated email. Your details have been shared with our CRM team for follow-up.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

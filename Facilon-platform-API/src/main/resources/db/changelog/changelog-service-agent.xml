@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- Service Agents table -->
+    <changeSet id="sa-1" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS service_agents (
+                id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+                authorized_user_id  BIGINT NOT NULL,
+                agent_code          VARCHAR(50) UNIQUE,
+                agent_type          VARCHAR(50) DEFAULT 'SERVICE_AGENT',
+                full_name           VARCHAR(200),
+                email               VARCHAR(200),
+                mobile              VARCHAR(50),
+                assigned_region     VARCHAR(100),
+                assigned_segment    VARCHAR(100),
+                is_active           TINYINT(1) DEFAULT 1,
+                onboarding_status   VARCHAR(50) DEFAULT 'APPROVED',
+                tenant_id           BIGINT NOT NULL,
+                created_by          VARCHAR(255),
+                created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by         VARCHAR(255),
+                modified_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_sa_authorized_user FOREIGN KEY (authorized_user_id)
+                    REFERENCES authorized_user(authorized_user_id) ON DELETE CASCADE,
+                INDEX idx_sa_authorized_user (authorized_user_id),
+                INDEX idx_sa_tenant (tenant_id)
+            )
+        </sql>
+    </changeSet>
+
+    <!-- Investor-ServiceAgent delegations table -->
+    <changeSet id="sa-2" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS investor_service_agent_delegations (
+                id                      BIGINT AUTO_INCREMENT PRIMARY KEY,
+                investor_id             BIGINT NOT NULL,
+                service_agent_id        BIGINT NOT NULL,
+                scope                   VARCHAR(50) NOT NULL,
+                can_view_profile        TINYINT(1) DEFAULT 1,
+                can_edit_kyc            TINYINT(1) DEFAULT 0,
+                can_upload_documents    TINYINT(1) DEFAULT 0,
+                can_submit_forms        TINYINT(1) DEFAULT 0,
+                valid_from              DATE,
+                valid_to                DATE,
+                is_active               TINYINT(1) DEFAULT 1,
+                consent_version         VARCHAR(20),
+                notes                   TEXT,
+                tenant_id               BIGINT NOT NULL,
+                created_by              VARCHAR(255),
+                created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by             VARCHAR(255),
+                modified_at             TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_deleg_investor FOREIGN KEY (investor_id)
+                    REFERENCES investor(investor_id) ON DELETE CASCADE,
+                CONSTRAINT fk_deleg_service_agent FOREIGN KEY (service_agent_id)
+                    REFERENCES service_agents(id) ON DELETE CASCADE,
+                INDEX idx_deleg_investor (investor_id),
+                INDEX idx_deleg_agent (service_agent_id),
+                INDEX idx_deleg_active (is_active, valid_from, valid_to)
+            )
+        </sql>
+    </changeSet>
+
+    <!-- Service agent audit logs table -->
+    <changeSet id="sa-3" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS service_agent_audit_logs (
+                id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+                service_agent_id    BIGINT NOT NULL,
+                investor_id         BIGINT NOT NULL,
+                delegation_id       BIGINT,
+                action_type         VARCHAR(100) NOT NULL,
+                action_category     VARCHAR(100),
+                entity_type         VARCHAR(100),
+                entity_id           VARCHAR(100),
+                endpoint            VARCHAR(500),
+                http_method         VARCHAR(10),
+                success             TINYINT(1) DEFAULT 1,
+                error_message       TEXT,
+                ip_address          VARCHAR(50),
+                user_agent          TEXT,
+                tenant_id           BIGINT NOT NULL,
+                created_by          VARCHAR(255),
+                created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                modified_by         VARCHAR(255),
+                modified_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_audit_agent (service_agent_id),
+                INDEX idx_audit_investor (investor_id),
+                INDEX idx_audit_created (created_at)
+            )
+        </sql>
+    </changeSet>
+
+    <!-- SERVICE_AGENT user group -->
+    <changeSet id="sa-4" author="facilon">
+        <sql>
+            INSERT IGNORE INTO user_group (group_name, description, is_active, tenant_id, created_by, created_at)
+            SELECT 'SERVICE_AGENT', 'Service Agent / Client Executive group', 1, tenant_id, 'SYSTEM', NOW()
+            FROM tenant LIMIT 1;
+        </sql>
+    </changeSet>
+
+    <!-- SERVICE_AGENT role -->
+    <changeSet id="sa-5" author="facilon">
+        <sql>
+            INSERT IGNORE INTO role_list (label, sequence_no, parent_list_id, is_active, tenant_id, created_by, created_at)
+            SELECT 'SERVICE_AGENT', 99, NULL, 1, tenant_id, 'SYSTEM', NOW()
+            FROM tenant LIMIT 1;
+        </sql>
+    </changeSet>
+
+    <!-- Link SERVICE_AGENT group → SERVICE_AGENT role -->
+    <changeSet id="sa-6" author="facilon">
+        <sql>
+            INSERT IGNORE INTO group_role (group_id, role_list_id)
+            SELECT ug.group_id, rl.role_list_id
+            FROM user_group ug, role_list rl
+            WHERE ug.group_name = 'SERVICE_AGENT'
+              AND rl.label = 'SERVICE_AGENT';
+        </sql>
+    </changeSet>
+
+    <!-- Fine-grained authority_list rows for SERVICE_AGENT -->
+    <changeSet id="sa-7" author="facilon">
+        <sql>
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_VIEW_INVESTORS',         'View assigned investor list',                  '/api/service-agents/me/investors',             t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_VIEW_INVESTOR_PROFILE',  'View investor profile and KYC data',           '/api/service-agents/me/investors/*/profile',   t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_EDIT_INVESTOR_KYC',      'Edit investor KYC and personal info',          '/api/service-agents/me/investors/*/kyc',        t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_UPLOAD_DOCUMENTS',       'Upload documents on behalf of investor',       '/api/service-agents/me/investors/*/documents',  t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_SUBMIT_FORMS',           'Submit forms on behalf of investor',           '/api/service-agents/me/investors/*/submit',     t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_MANAGE_DELEGATIONS',     'Accept and manage delegation requests',        '/api/service-agents/me/delegations',            t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'SA_VIEW_AUDIT',             'View own audit trail',                         '/api/service-agents/me/audit-logs',             t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+        </sql>
+    </changeSet>
+
+    <!-- Link SERVICE_AGENT role → authorities -->
+    <changeSet id="sa-8" author="facilon">
+        <sql>
+            INSERT IGNORE INTO role_authority (role_list_id, authority_list_id)
+            SELECT rl.role_list_id, al.authority_list_id
+            FROM role_list rl, authority_list al
+            WHERE rl.label = 'SERVICE_AGENT'
+              AND al.authority_name IN (
+                  'SA_VIEW_INVESTORS', 'SA_VIEW_INVESTOR_PROFILE', 'SA_EDIT_INVESTOR_KYC',
+                  'SA_UPLOAD_DOCUMENTS', 'SA_SUBMIT_FORMS', 'SA_MANAGE_DELEGATIONS', 'SA_VIEW_AUDIT'
+              );
+        </sql>
+    </changeSet>
+
+
+    <!-- Add missing columns to service_agents -->
+    <changeSet id="sa-9" author="facilon">
+        <sql>
+            ALTER TABLE service_agents
+                ADD COLUMN IF NOT EXISTS service_provider_id  BIGINT        NULL,
+                ADD COLUMN IF NOT EXISTS photo_url            VARCHAR(500)  NULL,
+                ADD COLUMN IF NOT EXISTS pan_number           VARCHAR(20)   NULL,
+                ADD COLUMN IF NOT EXISTS address_proof_url    VARCHAR(500)  NULL,
+                ADD COLUMN IF NOT EXISTS registration_number  VARCHAR(100)  NULL,
+                ADD COLUMN IF NOT EXISTS dv_service_agent_id  VARCHAR(100)  NULL,
+                ADD COLUMN IF NOT EXISTS onboarded_at         TIMESTAMP     NULL,
+                ADD COLUMN IF NOT EXISTS onboarded_by         VARCHAR(200)  NULL,
+                ADD COLUMN IF NOT EXISTS deleted_at           TIMESTAMP     NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Add missing columns to investor_service_agent_delegations -->
+    <changeSet id="sa-10" author="facilon">
+        <sql>
+            ALTER TABLE investor_service_agent_delegations
+                ADD COLUMN consent_reference    VARCHAR(100)  NULL,
+                ADD COLUMN consent_given_at     TIMESTAMP     NULL,
+                ADD COLUMN consent_ip_address   VARCHAR(50)   NULL,
+                ADD COLUMN consent_user_agent   TEXT          NULL,
+                ADD COLUMN dv_delegation_id     VARCHAR(100)  NULL,
+                ADD COLUMN revoked_at           TIMESTAMP     NULL,
+                ADD COLUMN revoked_by           VARCHAR(200)  NULL,
+                ADD COLUMN revocation_reason    TEXT          NULL,
+                ADD COLUMN deleted_at           TIMESTAMP     NULL,
+                ADD COLUMN status               VARCHAR(50)   DEFAULT 'ACTIVE',
+                ADD COLUMN assigned_by_sp_id    BIGINT        NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Add missing columns to service_agent_audit_logs -->
+    <changeSet id="sa-11" author="facilon">
+        <sql>
+            ALTER TABLE service_agent_audit_logs
+                ADD COLUMN IF NOT EXISTS request_payload  TEXT          NULL,
+                ADD COLUMN IF NOT EXISTS response_status  INT           NULL,
+                ADD COLUMN IF NOT EXISTS field_changed    VARCHAR(200)  NULL,
+                ADD COLUMN IF NOT EXISTS old_value        TEXT          NULL,
+                ADD COLUMN IF NOT EXISTS new_value        TEXT          NULL,
+                ADD COLUMN IF NOT EXISTS session_id       VARCHAR(200)  NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Additional authorities for Service Agent (ticket/work-order capabilities) -->
+    <changeSet id="sa-12" author="facilon">
+        <sql>
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'MANAGE_SERVICE_TICKETS', 'Create and manage service tickets', '/api/service-agents/me/tickets', t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'VIEW_WORK_ORDERS', 'View work orders', '/api/service-agents/me/work-orders', t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+            INSERT IGNORE INTO authority_list (authority_name, description, resource_pattern, tenant_id, created_by, created_at)
+            SELECT 'ESCALATE_TICKET', 'Escalate tickets to supervisor', '/api/service-agents/me/tickets/*/escalate', t.tenant_id, 'SYSTEM', NOW() FROM tenant t LIMIT 1;
+        </sql>
+    </changeSet>
+
+    <!-- Link SERVICE_AGENT role to the 3 new authorities -->
+    <changeSet id="sa-13" author="facilon">
+        <sql>
+            INSERT IGNORE INTO role_authority (role_list_id, authority_list_id)
+            SELECT rl.role_list_id, al.authority_list_id
+            FROM role_list rl, authority_list al
+            WHERE rl.label = 'SERVICE_AGENT'
+              AND al.authority_name IN ('MANAGE_SERVICE_TICKETS', 'VIEW_WORK_ORDERS', 'ESCALATE_TICKET');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

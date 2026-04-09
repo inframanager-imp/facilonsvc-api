@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAN and OCI Required</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .critical-box {background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .critical-box h3 {margin-top: 0; color: #721c24;}
+        .comparison-table {width: 100%; border-collapse: collapse; margin: 20px 0;}
+        .comparison-table th, .comparison-table td {padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6;}
+        .comparison-table th {background-color: #f8f9fa; font-weight: bold;}
+        .check {color: #28a745; font-weight: bold;}
+        .cross {color: #dc3545; font-weight: bold;}
+        .timeline-box {background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .option-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⚠️ PAN & OCI Required</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>Thank you for registering with Facilon Platform.</p>
+
+            <div class="critical-box">
+                <h3>⚠️ IMPORTANT: Both documents are highly recommended for investing in India</h3>
+                <p>We noticed that you are of Indian origin but currently do not have:</p>
+                <ul>
+                    <li>✗ PAN (Permanent Account Number)</li>
+                    <li>✗ OCI (Overseas Citizen of India) Card</li>
+                </ul>
+            </div>
+
+            <h3>Why You Need These Documents:</h3>
+
+            <div class="option-box">
+                <h4>📋 PAN (Permanent Account Number):</h4>
+                <ul>
+                    <li>✓ Mandatory for all investment transactions in India</li>
+                    <li>✓ Required by SEBI for KYC compliance</li>
+                    <li>✓ Necessary for tax filing and reporting</li>
+                    <li>✓ Can be obtained even if living abroad</li>
+                    <li>✓ Lifetime validity</li>
+                </ul>
+            </div>
+
+            <div class="option-box">
+                <h4>🛂 OCI (Overseas Citizen of India) Card:</h4>
+                <ul>
+                    <li>✓ Provides NRI-equivalent investment rights</li>
+                    <li>✓ No RBI approval needed for most investments</li>
+                    <li>✓ Can repatriate investment proceeds</li>
+                    <li>✓ Lifelong multiple entry visa to India</li>
+                    <li>✓ Can purchase property (except agricultural land)</li>
+                    <li>✓ Lifetime validity (with updates at age milestones)</li>
+                </ul>
+            </div>
+
+            <h3>Comparison: With vs Without PAN & OCI</h3>
+
+            <table class="comparison-table">
+                <tr>
+                    <th>Feature</th>
+                    <th><span class="check">WITH PAN + OCI</span></th>
+                    <th><span class="cross">WITHOUT PAN + OCI</span></th>
+                </tr>
+                <tr>
+                    <td>Investment Access</td>
+                    <td><span class="check">✓</span> Full access</td>
+                    <td><span class="cross">✗</span> Limited</td>
+                </tr>
+                <tr>
+                    <td>Repatriation</td>
+                    <td><span class="check">✓</span> Allowed</td>
+                    <td><span class="cross">✗</span> Restricted</td>
+                </tr>
+                <tr>
+                    <td>Compliance</td>
+                    <td><span class="check">✓</span> Simplified</td>
+                    <td><span class="cross">✗</span> Complex</td>
+                </tr>
+                <tr>
+                    <td>Processing Time</td>
+                    <td><span class="check">✓</span> Faster</td>
+                    <td><span class="cross">✗</span> Longer</td>
+                </tr>
+                <tr>
+                    <td>Investment Route</td>
+                    <td><span class="check">✓</span> NRI/OCI</td>
+                    <td><span class="cross">✗</span> FPI only</td>
+                </tr>
+            </table>
+
+            <div class="timeline-box">
+                <h4>⏱️ Timeline if you start today:</h4>
+                <ul>
+                    <li><strong>Week 1-2:</strong> Apply for both PAN and OCI online</li>
+                    <li><strong>Week 3-4:</strong> Receive PAN</li>
+                    <li><strong>Week 5-6:</strong> OCI in process</li>
+                    <li><strong>Week 6-8:</strong> Receive OCI card</li>
+                    <li><strong>Week 9:</strong> Update Facilon profile and complete onboarding</li>
+                </ul>
+                <p><strong>Total: ~6-8 weeks</strong> (applications can be done in parallel)</p>
+            </div>
+
+            <h3>Our Recommendation:</h3>
+
+            <div class="option-box">
+                <h4>✅ We strongly recommend obtaining both PAN and OCI for:</h4>
+                <ol>
+                    <li><strong>Maximum Investment Flexibility</strong> - Access to all investment products</li>
+                    <li><strong>Cost Savings</strong> - Lower transaction costs, simplified compliance</li>
+                    <li><strong>Time Savings</strong> - Faster onboarding, quicker transaction processing</li>
+                    <li><strong>Long-term Benefits</strong> - Beyond investment, lifetime validity, travel and property rights</li>
+                </ol>
+            </div>
+
+            <h3>What Happens Next?</h3>
+
+            <p><strong>Option A: Obtain PAN + OCI (Recommended)</strong></p>
+            <ul>
+                <li>Apply for both documents</li>
+                <li>Update your profile once received</li>
+                <li>Complete onboarding with full benefits</li>
+                <li>Start investing within 6-8 weeks</li>
+            </ul>
+
+            <p><strong>Option B: Continue as Foreign National</strong></p>
+            <ul>
+                <li>Proceed via FPI route</li>
+                <li>More documentation required</li>
+                <li>Higher costs and restrictions</li>
+                <li>Contact us for FPI onboarding process</li>
+            </ul>
+
+            <p><strong>We have saved your registration.</strong> You can update your profile anytime:</p>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/login" class="button">Login to Your Account</a>
+                <a href="{{baseUrl}}/help/pan-guide" class="button">PAN Guide</a>
+                <a href="{{baseUrl}}/help/oci-guide" class="button">OCI Guide</a>
+            </div>
+
+            <div class="critical-box">
+                <h4>💬 Need Help?</h4>
+                <p>Our NRI/PIO support team is here to assist:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>WhatsApp:</strong> {{supportPhone}}
+                </p>
+            </div>
+
+            <p>We're here to help you through this process!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon NRI Services Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Your registration is on hold. Please obtain PAN and OCI to continue with the best investment experience.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

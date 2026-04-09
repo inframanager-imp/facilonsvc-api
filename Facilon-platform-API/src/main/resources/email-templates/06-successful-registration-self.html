@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Successful</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .success-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .step-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 15px 0; border-radius: 4px;}
+        .step-box h4 {margin-top: 0; color: #495057;}
+        .benefits-box {background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 14px 35px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px; font-size: 16px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎉 Congratulations!</h1>
+            <p style="margin: 10px 0; font-size: 18px;">Registration Successful</p>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>Congratulations! Your registration with Facilon Platform has been completed successfully.</p>
+
+            <div class="success-box">
+                <h3>✅ Registration Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Investor Code:</strong></td>
+                        <td style="padding: 5px 0;">{{uniqueCode}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Active - Ready to Begin</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>Your Login Details:</h3>
+            <p>You can now access your account using the credentials you created during registration.</p>
+            <p><strong>Login URL:</strong> {{loginUrl}}<br>
+            <strong>Your Investor Code:</strong> {{uniqueCode}}</p>
+
+            <h3>🚀 Next Steps to Start Investing:</h3>
+
+            <div class="step-box">
+                <h4>Step 1: Complete Your Profile (15 minutes)</h4>
+                <ul>
+                    <li>✓ Complete personal information</li>
+                    <li>✓ Add bank account details</li>
+                    <li>✓ Set investment preferences</li>
+                </ul>
+                <p><a href="{{baseUrl}}/investor/profile">Complete Profile →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 2: Upload KYC Documents (10 minutes)</h4>
+                <ul>
+                    <li>✓ Identity proof (PAN/Passport/Aadhaar)</li>
+                    <li>✓ Address proof</li>
+                    <li>✓ Bank account proof</li>
+                    <li>✓ Recent photograph</li>
+                </ul>
+                <p><a href="{{baseUrl}}/investor/documents">Upload Documents →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 3: In-Person Verification (Optional - 30 minutes)</h4>
+                <p>Schedule an appointment at your nearest Facilon center for document verification.</p>
+                <p><a href="{{baseUrl}}/investor/appointments">Schedule Appointment →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 4: Start Investing</h4>
+                <p>Once verification is complete, you can:</p>
+                <ul>
+                    <li>✓ Browse investment opportunities</li>
+                    <li>✓ Connect with investment advisors</li>
+                    <li>✓ Start your investment journey</li>
+                </ul>
+            </div>
+
+            <div class="benefits-box">
+                <h3>Why Choose Facilon?</h3>
+                <ul>
+                    <li>✓ Trusted by thousands of investors</li>
+                    <li>✓ Expert financial advisory services</li>
+                    <li>✓ Secure and compliant platform</li>
+                    <li>✓ Transparent fee structure</li>
+                    <li>✓ Dedicated customer support</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{loginUrl}}" class="button">Login to Your Account</a>
+            </div>
+
+            <div class="success-box">
+                <h4>💬 Need Help Getting Started?</h4>
+                <p>Our team is here to assist you:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Live Chat:</strong> <a href="{{baseUrl}}/help">{{baseUrl}}/help</a>
+                </p>
+                <p><strong>FAQs:</strong> <a href="{{baseUrl}}/help/getting-started">Getting Started Guide</a></p>
+            </div>
+
+            <p>We're excited to be part of your investment journey!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Platform Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Questions? Contact us at {{supportEmail}}</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

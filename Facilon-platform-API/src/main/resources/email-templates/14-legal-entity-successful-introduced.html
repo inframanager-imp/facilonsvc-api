@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Registration Complete - Schedule Appointment</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 750px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .highlight-box {background-color: #e7e3fc; border-left: 4px solid #6f42c1; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .appointment-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .documents-box {background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .benefits-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .checklist {background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0;}
+        .button {display: inline-block; padding: 14px 35px; background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px; font-size: 16px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎉 Congratulations!</h1>
+            <p style="margin: 10px 0; font-size: 18px;">Corporate Registration Complete</p>
+        </div>
+        <div class="content">
+            <p>Dear {{representativeName}},</p>
+            
+            <p>Congratulations! Registration for <strong>{{entityName}}</strong> has been completed successfully.</p>
+
+            <div class="highlight-box">
+                <h3>✅ Registration Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Legal Entity:</strong></td>
+                        <td style="padding: 5px 0;">{{entityName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Representative:</strong></td>
+                        <td style="padding: 5px 0;">{{representativeName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Introduced By:</strong></td>
+                        <td style="padding: 5px 0;">{{serviceProviderName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Active - Ready for Appointment</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🌟 Great News!</h3>
+                <p>Your service provider, <strong>{{serviceProviderName}}</strong>, has already pre-selected corporate services and investment options tailored for <strong>{{entityName}}</strong>. This will expedite your onboarding process significantly.</p>
+            </div>
+
+            <h3>📅 Next Step: Schedule Your Corporate Appointment</h3>
+
+            <p>To complete your corporate onboarding, please schedule an appointment with your service provider:</p>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{{appointmentUrl}}" class="button">Schedule Appointment Now</a>
+            </div>
+
+            <div class="appointment-box">
+                <h4>During the Appointment:</h4>
+                <ul>
+                    <li>✓ Review pre-selected investment solutions for your entity</li>
+                    <li>✓ Complete corporate document verification</li>
+                    <li>✓ Discuss your organization's investment objectives and strategy</li>
+                    <li>✓ Finalize investment plan and portfolio structure</li>
+                    <li>✓ Sign corporate agreements and mandate forms</li>
+                    <li>✓ Set up authorized signatories and access permissions</li>
+                    <li>✓ Complete the corporate onboarding process</li>
+                </ul>
+            </div>
+
+            <h3>📄 What to Bring (Original + Copies):</h3>
+
+            <div class="documents-box">
+                <h4>Corporate Documents:</h4>
+                <ul>
+                    <li>✓ Certificate of Incorporation</li>
+                    <li>✓ Memorandum & Articles of Association</li>
+                    <li>✓ PAN Card of the legal entity</li>
+                    <li>✓ Address proof of registered office (utility bill, lease agreement)</li>
+                    <li>✓ Board Resolution authorizing investment and appointing representative</li>
+                    <li>✓ List of Directors/Partners/Authorized signatories</li>
+                    <li>✓ Corporate bank account proof (cancelled cheque or bank statement)</li>
+                    <li>✓ Recent financial statements (Balance Sheet, P&L)</li>
+                    <li>✓ GST Registration certificate (if applicable)</li>
+                    <li>✓ Any other documents specified by your service provider</li>
+                </ul>
+            </div>
+
+            <div class="documents-box">
+                <h4>Representative's Documents:</h4>
+                <ul>
+                    <li>✓ Government-issued ID (PAN card, Aadhaar, Passport, Driving License)</li>
+                    <li>✓ Address proof</li>
+                    <li>✓ Recent photograph</li>
+                    <li>✓ Power of Attorney or authorization letter from the entity</li>
+                </ul>
+            </div>
+
+            <div class="benefits-box">
+                <h4>✨ Benefits of Being Introduced:</h4>
+                <ul>
+                    <li>✓ Faster corporate onboarding process</li>
+                    <li>✓ Pre-vetted investment options tailored to corporate needs</li>
+                    <li>✓ Personalized service from your dedicated advisor</li>
+                    <li>✓ Direct access to expert corporate guidance</li>
+                    <li>✓ Priority appointment scheduling</li>
+                    <li>✓ Reduced documentation requirements (leveraging SP relationship)</li>
+                    <li>✓ Streamlined compliance process</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <h4>Your Service Provider:</h4>
+                <p><strong>{{serviceProviderName}}</strong> has been assisting corporate clients like <strong>{{entityName}}</strong> and will guide your organization through every step of the investment process, ensuring compliance and optimal investment strategies.</p>
+            </div>
+
+            <div class="checklist">
+                <h4>📋 Pre-Appointment Checklist:</h4>
+                <p>Before your appointment, please:</p>
+                <ul>
+                    <li>☐ Gather all required corporate documents</li>
+                    <li>☐ Get Board Resolution passed and notarized</li>
+                    <li>☐ Ensure PAN card is valid and accessible</li>
+                    <li>☐ Prepare list of authorized signatories with their ID proofs</li>
+                    <li>☐ Review investment objectives and risk appetite</li>
+                    <li>☐ Prepare questions for your service provider</li>
+                    <li>☐ Check authorized signatory availability for appointment</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <h4>💬 Questions Before Your Appointment?</h4>
+                <p>If you have any questions, feel free to reach out:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Corporate Support:</strong> <a href="{{baseUrl}}/corporate/support">{{baseUrl}}/corporate/support</a>
+                </p>
+            </div>
+
+            <p>We look forward to seeing you at your appointment!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Corporate Services Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Schedule your appointment: {{appointmentUrl}}</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

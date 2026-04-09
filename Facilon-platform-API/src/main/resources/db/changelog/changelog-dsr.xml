@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <changeSet id="dsr-1-create-dsr-cases" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS dsr_cases (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NOT NULL,
+                case_id VARCHAR(64) NOT NULL,
+                investor_unique_code VARCHAR(64) NOT NULL,
+                request_type VARCHAR(64) NOT NULL,
+                jurisdiction VARCHAR(64) NOT NULL,
+                request_description TEXT NOT NULL,
+                requester_name VARCHAR(255) NOT NULL,
+                requester_email VARCHAR(255) NOT NULL,
+                requester_phone VARCHAR(64),
+                requester_role VARCHAR(64),
+                supporting_file_path VARCHAR(512),
+                status VARCHAR(64) NOT NULL,
+                sla_deadline TIMESTAMP NOT NULL,
+                assigned_to VARCHAR(255),
+                resolution_notes TEXT,
+                resolved_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_dsr_cases_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id) ON DELETE CASCADE,
+                CONSTRAINT uk_dsr_cases_case_id UNIQUE (case_id)
+            );
+
+            CREATE INDEX idx_dsr_cases_investor_unique_code ON dsr_cases(investor_unique_code);
+            CREATE INDEX idx_dsr_cases_status_sla ON dsr_cases(status, sla_deadline);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

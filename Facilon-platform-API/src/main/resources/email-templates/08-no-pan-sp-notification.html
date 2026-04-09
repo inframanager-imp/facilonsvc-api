@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Required - Investor PAN Missing</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .alert-box {background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .alert-box h3 {margin-top: 0; color: #721c24;}
+        .impact-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .action-box {background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .resources-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⚠️ Action Required</h1>
+            <p style="margin: 5px 0;">Investor PAN Missing</p>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{spName}}</strong>,</p>
+            
+            <p>This is an important notification regarding an investor you introduced to Facilon Platform.</p>
+
+            <div class="alert-box">
+                <h3>📋 Investor Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Name:</strong></td>
+                        <td style="padding: 5px 0;">{{investorName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Email:</strong></td>
+                        <td style="padding: 5px 0;">{{investorEmail}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Issue:</strong></td>
+                        <td style="padding: 5px 0; color: #dc3545; font-weight: bold;">PAN Not Available</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Registration Incomplete</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="impact-box">
+                <h3>⚠️ What This Means:</h3>
+                <p>The investor you introduced has indicated that they do not have a PAN (Permanent Account Number). As per SEBI regulations, PAN is mandatory for all Indian residents to invest in securities.</p>
+                <h4>Impact:</h4>
+                <ul>
+                    <li>✗ The investor cannot complete the onboarding process without PAN</li>
+                    <li>✗ No investment transactions can be processed</li>
+                    <li>✗ KYC verification cannot be completed</li>
+                    <li>✗ Account activation is on hold</li>
+                </ul>
+            </div>
+
+            <h3>📌 Recommended Actions:</h3>
+
+            <div class="action-box">
+                <h4>Option 1: Assist Investor in Obtaining PAN</h4>
+                <p>Guide the investor to apply for PAN through:</p>
+                <ol>
+                    <li><strong>NSDL website (fastest):</strong> <a href="https://www.onlineservices.nsdl.com/paam">https://www.onlineservices.nsdl.com/paam</a></li>
+                    <li><strong>Through Aadhaar e-KYC:</strong> Instant e-PAN</li>
+                    <li><strong>TIN-Facilitation Centers:</strong> Physical application</li>
+                </ol>
+                <p><strong>Processing time:</strong> Instant (via Aadhaar) to 15 days (regular)</p>
+                <p>Once PAN is obtained, investor can update profile and continue.</p>
+            </div>
+
+            <div class="action-box">
+                <h4>Option 2: Verify Investor's Residency Status</h4>
+                <ul>
+                    <li>If the investor is NOT an Indian resident, they may not need PAN</li>
+                    <li>NRIs need PAN for India investments</li>
+                    <li>Foreign nationals follow different compliance requirements</li>
+                    <li>Please verify and update the investor's status</li>
+                </ul>
+            </div>
+
+            <h3>🚀 Next Steps:</h3>
+            <ol>
+                <li>Contact the investor: <strong>{{investorEmail}}</strong></li>
+                <li>Clarify their residency status</li>
+                <li>Assist with PAN application if they are Indian resident</li>
+                <li>Update us once PAN is obtained or status is clarified</li>
+            </ol>
+
+            <div class="resources-box">
+                <h4>📚 Support Resources:</h4>
+                <p>We have sent detailed PAN application instructions to the investor. You can also access these resources:</p>
+                <ul>
+                    <li>PAN Application Guide: <a href="{{baseUrl}}/resources/pan-guide">{{baseUrl}}/resources/pan-guide</a></li>
+                    <li>Service Provider Portal: <a href="{{baseUrl}}/sp/dashboard">{{baseUrl}}/sp/dashboard</a></li>
+                </ul>
+                <p><strong>Note:</strong> The investor's registration is currently on hold. Once the PAN issue is resolved, the onboarding process can continue.</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/sp/dashboard" class="button">Go to SP Dashboard</a>
+            </div>
+
+            <div class="alert-box">
+                <h4>💬 Need Assistance?</h4>
+                <p>If you need help or have questions:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Service Provider Support:</strong> <a href="{{baseUrl}}/sp/support">{{baseUrl}}/sp/support</a>
+                </p>
+            </div>
+
+            <p>Thank you for your cooperation in ensuring compliance.</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Compliance Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please take action promptly.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

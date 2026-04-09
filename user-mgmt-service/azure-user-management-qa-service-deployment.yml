@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-mgmt-qa-deployment
+  namespace: fs-qa
+  labels:
+    app: user-mgmt-qa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-mgmt-qa
+  template:
+    metadata:
+      labels:
+        app: user-mgmt-qa
+    spec:
+      containers:
+      - name: user-mgmt-qa
+        image: fispokecontainerregqa.azurecr.io/azure-user-management-qa:1
+        ports:
+        - containerPort: 9091
+        envFrom:
+        - configMapRef:
+            name: fs-qa-configmap
+        - secretRef:
+            name: fs-qa-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-mgmt-qa-svc
+  namespace: fs-qa
+spec:
+  selector:
+    app: user-mgmt-qa
+  ports:
+    - protocol: TCP
+      port: 9091
+      targetPort: 9091
+  type: ClusterIP
+

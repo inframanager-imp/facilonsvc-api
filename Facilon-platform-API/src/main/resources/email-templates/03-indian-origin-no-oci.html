@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCI Card Required for Registration</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 650px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .info-box {background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .info-box h3 {margin-top: 0; color: #0c5460;}
+        .benefits-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .benefits-box h4 {margin-top: 0; color: #155724;}
+        .process-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🛂 OCI Card Application Guide</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{investorName}}</strong>,</p>
+            
+            <p>Thank you for registering with Facilon Platform.</p>
+
+            <p>We noticed that you indicated you are of Indian origin but do not have an OCI (Overseas Citizen of India) Card.</p>
+
+            <div class="info-box">
+                <h3>⚠️ IMPORTANT: OCI Card Benefits for Investment in India</h3>
+                <p>As a Person of Indian Origin (PIO), having an OCI card provides significant benefits.</p>
+            </div>
+
+            <div class="benefits-box">
+                <h4>✓ Investment Benefits:</h4>
+                <ul>
+                    <li>Invest in Indian securities on repatriation basis</li>
+                    <li>No RBI approval required for most investments</li>
+                    <li>Same rights as NRIs for financial transactions</li>
+                    <li>Open NRO/NRE accounts easily</li>
+                </ul>
+
+                <h4>✓ Other Benefits:</h4>
+                <ul>
+                    <li>Lifelong multiple entry visa</li>
+                    <li>No registration with FRRO required</li>
+                    <li>Can purchase property in India (except agricultural land)</li>
+                    <li>No requirement for work permit</li>
+                </ul>
+            </div>
+
+            <h3>How to Apply for OCI Card:</h3>
+
+            <div class="benefits-box">
+                <h4>Eligibility:</h4>
+                <p>You are eligible if:</p>
+                <ul>
+                    <li>You were a citizen of India on or after 26th January 1950</li>
+                    <li>Your parents or grandparents were Indian citizens</li>
+                    <li>You are a spouse of an Indian citizen or OCI cardholder</li>
+                </ul>
+            </div>
+
+            <div class="process-box">
+                <h4>📝 Application Process:</h4>
+                <ol>
+                    <li>Visit: <a href="https://www.ociservices.gov.in">https://www.ociservices.gov.in</a></li>
+                    <li>Register and fill online application</li>
+                    <li>Upload required documents:
+                        <ul>
+                            <li>Current passport (all pages)</li>
+                            <li>Previous Indian passport (if any)</li>
+                            <li>Birth certificate</li>
+                            <li>Parent's passport/documents</li>
+                            <li>Address proof</li>
+                            <li>Photograph</li>
+                        </ul>
+                    </li>
+                    <li>Pay application fee (varies by country: $100-$275)</li>
+                    <li>Submit documents at Indian Embassy/VFS Center</li>
+                    <li>Receive OCI card within 4-6 weeks</li>
+                </ol>
+            </div>
+
+            <div class="process-box">
+                <h4>Alternative: Continue with PIO Status</h4>
+                <p>If you don't wish to apply for OCI now, you can still invest as:</p>
+                <ul>
+                    <li>Non-Resident Indian (NRI) - if you hold Indian passport</li>
+                    <li>Foreign National - with additional FEMA compliance</li>
+                </ul>
+                <p><strong>Note:</strong> Investment limits and procedures may differ.</p>
+            </div>
+
+            <h3>What Happens Next?</h3>
+            
+            <p><strong>Option 1: Apply for OCI (Recommended)</strong></p>
+            <ul>
+                <li>Apply for OCI card</li>
+                <li>Once received, update your profile</li>
+                <li>Continue registration with OCI benefits</li>
+            </ul>
+
+            <p><strong>Option 2: Continue as Foreign National</strong></p>
+            <ul>
+                <li>Provide passport details</li>
+                <li>Additional compliance may be required</li>
+                <li>Some investment restrictions may apply</li>
+            </ul>
+
+            <p><strong>We have saved your registration progress.</strong> You can resume anytime:</p>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/login" class="button">Login to Your Account</a>
+                <a href="https://www.mea.gov.in/oci.htm" class="button">Learn More About OCI</a>
+            </div>
+
+            <div class="info-box">
+                <h4>💬 Need Assistance?</h4>
+                <p>For OCI application or investment queries:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}
+                </p>
+            </div>
+
+            <p>We look forward to assisting you!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Platform Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Questions? Contact us at {{supportEmail}}</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

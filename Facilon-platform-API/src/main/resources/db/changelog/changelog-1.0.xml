@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- Creating AuthorizedUser table -->
+    <changeSet id="0" author="you">
+        <sql> CREATE TABLE IF NOT EXISTS authorized_user (
+            authorized_user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(255),
+            last_name VARCHAR(255),
+            mobile_phone VARCHAR(20),
+            email_id VARCHAR(255),
+            login_id VARCHAR(50) UNIQUE,
+            password VARCHAR(255),
+            failed_logins INT DEFAULT 0,
+            last_password_change TIMESTAMP,
+            last_failed TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active TINYINT(1),
+            created_by VARCHAR(255),
+            created_at TIMESTAMP,
+            modified_by VARCHAR(255),
+            modified_at TIMESTAMP
+            )
+        </sql>
+    </changeSet>
+    
+    <!-- Creating RoleList table -->
+    <changeSet id="1" author="you">
+        <sql>CREATE TABLE IF NOT EXISTS role_list (
+            role_list_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            label VARCHAR(255),
+            sequence_no INT,
+            parent_list_id BIGINT,
+            is_active TINYINT(1),
+            created_by VARCHAR(255),
+            created_at TIMESTAMP,
+            modified_by VARCHAR(255),
+            modified_at TIMESTAMP
+            )
+        </sql>
+    </changeSet>
+    
+    <!-- Creating UserRole table -->
+    <changeSet id="2" author="you">
+<sql>
+    CREATE TABLE IF NOT EXISTS user_role (
+    authorized_user_id BIGINT NOT NULL,
+    role_list_id BIGINT NOT NULL,
+    CONSTRAINT fk_authorized_user
+    FOREIGN KEY (authorized_user_id)
+    REFERENCES authorized_user (authorized_user_id)
+    ON DELETE CASCADE,
+    CONSTRAINT fk_role_list
+    FOREIGN KEY (role_list_id)
+    REFERENCES role_list (role_list_id)
+    ON DELETE CASCADE,
+    PRIMARY KEY (authorized_user_id, role_list_id)
+    );
+    CREATE INDEX idx_user_role_user_id ON user_role(authorized_user_id);
+    CREATE INDEX idx_user_role_role_id ON user_role(role_list_id);
+    CREATE UNIQUE INDEX idx_authorized_user_login_id ON authorized_user(login_id);
+
+</sql>
+    </changeSet>
+    
+    <!-- Creating PasswordResetToken table -->
+    <changeSet id="3.1" author="your">
+       <sql>CREATE TABLE IF NOT EXISTS password_reset_token (
+           password_reset_token_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+           token VARCHAR(255) NOT NULL,
+           authorized_user_id BIGINT NOT NULL,
+           expiry_date TIMESTAMP NOT NULL,
+           created_by VARCHAR(255),
+           created_at TIMESTAMP,
+           modified_by VARCHAR(255),
+           modified_at TIMESTAMP,
+           CONSTRAINT fk_password_reset_token_user_id FOREIGN KEY (authorized_user_id) REFERENCES authorized_user(authorized_user_id)
+           );
+       </sql>
+    </changeSet>
+    
+    <!-- Creating AuthorityList and RoleAuthority tables -->
+    <changeSet id="3.2" author="your">
+        <sql>
+            CREATE TABLE IF NOT EXISTS authority_list (
+            authority_list_id BIGINT AUTO_INCREMENT NOT NULL,
+            authority_name VARCHAR(255) NOT NULL,
+            description VARCHAR(255) NULL,
+            resource_pattern VARCHAR(255) NULL,
+            created_by VARCHAR(255),
+            created_at TIMESTAMP,
+            modified_by VARCHAR(255),
+            modified_at TIMESTAMP,
+            CONSTRAINT authority_list_pkey PRIMARY KEY (authority_list_id),
+            CONSTRAINT uk_authority_name UNIQUE (authority_name)
+            );
+            CREATE TABLE IF NOT EXISTS role_authority (
+            role_list_id BIGINT NOT NULL,
+            authority_list_id BIGINT NOT NULL,
+            CONSTRAINT role_authority_pkey PRIMARY KEY (role_list_id, authority_list_id),
+            CONSTRAINT fk_role_authority_role_list FOREIGN KEY (role_list_id) REFERENCES role_list (role_list_id) ON DELETE CASCADE,
+            CONSTRAINT fk_role_authority_authority_list FOREIGN KEY (authority_list_id) REFERENCES authority_list (authority_list_id) ON DELETE CASCADE
+            );
+        </sql>
+    </changeSet>
+
+    <!-- Creating Tenant table -->
+    <changeSet id="6" author="you">
+        <sql>
+            CREATE TABLE IF NOT EXISTS tenant (
+                tenant_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(256),
+                email_domain VARCHAR(256),
+                address VARCHAR(256),
+                state VARCHAR(256),
+                postal_code VARCHAR(256),
+                is_active TINYINT(1) DEFAULT 1,
+                country VARCHAR(256),
+                created_by VARCHAR(255),
+                created_at TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP
+            );
+        </sql>
+    </changeSet>
+
+    <!-- Creating UserGroup and GroupRole tables -->
+    <changeSet id="7" author="you">
+        <sql>
+            CREATE TABLE IF NOT EXISTS user_group (
+                group_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                group_name VARCHAR(255) UNIQUE NOT NULL,
+                description TEXT,
+                tenant_id BIGINT NOT NULL,
+                is_active TINYINT(1) DEFAULT 1,
+                created_by VARCHAR(255),
+                created_at TIMESTAMP,
+                modified_by VARCHAR(255),
+                modified_at TIMESTAMP,
+                CONSTRAINT fk_user_group_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS group_role (
+                group_id BIGINT NOT NULL,
+                role_list_id BIGINT NOT NULL,
+                CONSTRAINT fk_group_role_group FOREIGN KEY (group_id) REFERENCES user_group(group_id) ON DELETE CASCADE,
+                CONSTRAINT fk_group_role_role FOREIGN KEY (role_list_id) REFERENCES role_list(role_list_id) ON DELETE CASCADE,
+                PRIMARY KEY (group_id, role_list_id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS user_group_mapping (
+                authorized_user_id BIGINT NOT NULL,
+                group_id BIGINT NOT NULL,
+                CONSTRAINT fk_user_group_mapping_user FOREIGN KEY (authorized_user_id) REFERENCES authorized_user(authorized_user_id) ON DELETE CASCADE,
+                CONSTRAINT fk_user_group_mapping_group FOREIGN KEY (group_id) REFERENCES user_group(group_id) ON DELETE CASCADE,
+                PRIMARY KEY (authorized_user_id, group_id)
+            );
+        </sql>
+    </changeSet>
+
+    <!-- Adding tenant_id columns to existing tables for multi-tenancy -->
+    <changeSet id="8" author="you">
+        <sql>
+            -- Add tenant_id column to authorized_user table
+            ALTER TABLE authorized_user ADD COLUMN tenant_id BIGINT;
+            ALTER TABLE authorized_user ADD CONSTRAINT fk_authorized_user_tenant 
+                FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id);
+            
+            -- Add tenant_id column to role_list table
+            ALTER TABLE role_list ADD COLUMN tenant_id BIGINT;
+            ALTER TABLE role_list ADD CONSTRAINT fk_role_list_tenant 
+                FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id);
+            
+            -- Add tenant_id column to authority_list table
+            ALTER TABLE authority_list ADD COLUMN tenant_id BIGINT;
+            ALTER TABLE authority_list ADD CONSTRAINT fk_authority_list_tenant 
+                FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id);
+            
+            -- Add tenant_id column to password_reset_token table
+            ALTER TABLE password_reset_token ADD COLUMN tenant_id BIGINT;
+            ALTER TABLE password_reset_token ADD CONSTRAINT fk_password_reset_token_tenant 
+                FOREIGN KEY (tenant_id) REFERENCES tenant(tenant_id);
+        </sql>
+    </changeSet>
+
+
+    <!-- ========== DATA INSERTION STARTS HERE ========== -->
+    
+    <!-- Insert default tenant -->
+    <changeSet id="9" author="you">
+        <sql>
+            INSERT INTO tenant (name, email_domain, address, state, postal_code, is_active, country, created_by, created_at, modified_by, modified_at)
+            VALUES ('Default Tenant', 'facilon.com', '123 Main St', 'CA', '12345', 1, 'USA', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+        </sql>
+    </changeSet>
+
+    <!-- Inserting sample data into RoleList table - Updated with proper role names -->
+    <changeSet id="11" author="you">
+        <sql>
+            -- Insert PLATFORM_SUPER_ADMIN role (for super admin users)
+            INSERT INTO role_list (label, sequence_no, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('PLATFORM_SUPER_ADMIN', 1, 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Insert ADMIN role (for admin users)
+            INSERT INTO role_list (label, sequence_no, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('ADMIN', 2, 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Insert USER role (for regular users)
+            INSERT INTO role_list (label, sequence_no, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('USER', 3, 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+        </sql>
+    </changeSet>
+
+    <!-- Inserting sample data into AuthorizedUser table - Updated with three users -->
+    <changeSet id="10" author="you">
+        <sql>
+            -- Super Admin User
+            INSERT INTO authorized_user (first_name, last_name, mobile_phone, email_id, login_id, password, failed_logins, last_password_change, last_failed, last_login, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('Super', 'Admin', '1234567890', 'superadmin@facilon.com', 'superadmin', '$2a$10$6FDMsJFTat2SCu/C8Ku3kuVFOotZA.TUEcM.8dUE39I93llNdxyQu', 0, '2023-01-01 12:00:00', null, '2023-01-01 12:00:00', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Admin User
+            INSERT INTO authorized_user (first_name, last_name, mobile_phone, email_id, login_id, password, failed_logins, last_password_change, last_failed, last_login, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('Admin', 'User', '1234567891', 'admin@facilon.com', 'admin', '$2a$10$6FDMsJFTat2SCu/C8Ku3kuVFOotZA.TUEcM.8dUE39I93llNdxyQu', 0, '2023-01-01 12:00:00', null, '2023-01-01 12:00:00', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Regular User
+            INSERT INTO authorized_user (first_name, last_name, mobile_phone, email_id, login_id, password, failed_logins, last_password_change, last_failed, last_login, is_active, tenant_id, created_by, created_at, modified_by, modified_at)
+            VALUES ('Regular', 'User', '1234567892', 'user@facilon.com', 'user', '$2a$10$6FDMsJFTat2SCu/C8Ku3kuVFOotZA.TUEcM.8dUE39I93llNdxyQu', 0, '2023-01-01 12:00:00', null, '2023-01-01 12:00:00', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+        </sql>
+    </changeSet>
+
+    <!-- Creating User Groups and assigning roles -->
+    <changeSet id="12" author="you">
+        <sql>
+            -- Create Super Admin Group
+            INSERT INTO user_group (group_name, description, tenant_id, is_active, created_by, created_at, modified_by, modified_at)
+            VALUES ('Super Admin Group', 'Group for platform super administrators', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Create Admin Group
+            INSERT INTO user_group (group_name, description, tenant_id, is_active, created_by, created_at, modified_by, modified_at)
+            VALUES ('Admin Group', 'Group for tenant administrators', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+            
+            -- Create User Group
+            INSERT INTO user_group (group_name, description, tenant_id, is_active, created_by, created_at, modified_by, modified_at)
+            VALUES ('User Group', 'Group for regular users', 1, 1, 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP);
+        </sql>
+    </changeSet>
+
+    <!-- Assigning roles to groups -->
+    <changeSet id="12.1" author="you">
+        <sql>
+            -- Assign PLATFORM_SUPER_ADMIN role to Super Admin Group (group_id = 1, role_list_id = 1)
+            INSERT INTO group_role (group_id, role_list_id)
+            VALUES (1, 1);
+            
+            -- Assign ADMIN role to Admin Group (group_id = 2, role_list_id = 2)
+            INSERT INTO group_role (group_id, role_list_id)
+            VALUES (2, 2);
+            
+            -- Assign USER role to User Group (group_id = 3, role_list_id = 3)
+            INSERT INTO group_role (group_id, role_list_id)
+            VALUES (3, 3);
+        </sql>
+    </changeSet>
+
+    <!-- Assigning users to groups -->
+    <changeSet id="12.2" author="you">
+        <sql>
+            -- Assign Super Admin user (authorized_user_id = 1) to Super Admin Group (group_id = 1)
+            INSERT INTO user_group_mapping (authorized_user_id, group_id)
+            VALUES (1, 1);
+            
+            -- Assign Admin user (authorized_user_id = 2) to Admin Group (group_id = 2)
+            INSERT INTO user_group_mapping (authorized_user_id, group_id)
+            VALUES (2, 2);
+            
+            -- Assign Regular user (authorized_user_id = 3) to User Group (group_id = 3)
+            INSERT INTO user_group_mapping (authorized_user_id, group_id)
+            VALUES (3, 3);
+        </sql>
+    </changeSet>
+
+    <!-- Add more change sets for additional data insertion -->
+    
+
+    <!-- Update existing user_group records to ensure is_active is set (if any exist without it) -->
+    <changeSet id="13" author="system">
+        <sql>
+            -- Update existing records to set is_active = 1 if NULL (for backward compatibility)
+            UPDATE user_group SET is_active = 1 WHERE is_active IS NULL;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

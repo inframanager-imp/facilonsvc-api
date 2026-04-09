@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Registration Successful</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 750px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .success-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .step-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 15px 0; border-radius: 4px;}
+        .step-box h4 {margin-top: 0; color: #495057;}
+        .benefits-box {background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 14px 35px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px; font-size: 16px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎉 Congratulations!</h1>
+            <p style="margin: 10px 0; font-size: 18px;">Corporate Registration Successful</p>
+        </div>
+        <div class="content">
+            <p>Dear {{representativeName}},</p>
+            
+            <p>Congratulations! Registration for <strong>{{entityName}}</strong> has been completed successfully.</p>
+
+            <div class="success-box">
+                <h3>✅ Registration Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Legal Entity:</strong></td>
+                        <td style="padding: 5px 0;">{{entityName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Entity Code:</strong></td>
+                        <td style="padding: 5px 0;">{{uniqueCode}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Representative:</strong></td>
+                        <td style="padding: 5px 0;">{{representativeName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Active - Ready to Begin</td>
+                    </tr>
+                </table>
+            </div>
+
+            <h3>Your Login Details:</h3>
+            <p>You can now access the corporate account:</p>
+            <p><strong>Login URL:</strong> {{loginUrl}}<br>
+            <strong>Entity Code:</strong> {{uniqueCode}}</p>
+
+            <h3>🚀 Next Steps for Corporate Onboarding:</h3>
+
+            <div class="step-box">
+                <h4>Step 1: Complete Corporate Profile (30 minutes)</h4>
+                <ul>
+                    <li>✓ Update complete entity information</li>
+                    <li>✓ Add corporate bank account details</li>
+                    <li>✓ Set investment preferences and objectives</li>
+                    <li>✓ Configure authorized signatories</li>
+                </ul>
+                <p><a href="{{baseUrl}}/corporate/profile">Complete Profile →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 2: Upload Corporate KYC Documents (20 minutes)</h4>
+                <ul>
+                    <li>✓ Certificate of Incorporation</li>
+                    <li>✓ Memorandum & Articles of Association</li>
+                    <li>✓ PAN Card of the entity</li>
+                    <li>✓ Board Resolution for investment</li>
+                    <li>✓ Address proof of registered office</li>
+                    <li>✓ Bank account proof (cancelled cheque/statement)</li>
+                    <li>✓ Identity proof of authorized signatories</li>
+                    <li>✓ Recent financial statements (if applicable)</li>
+                </ul>
+                <p><a href="{{baseUrl}}/corporate/documents">Upload Documents →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 3: Document Verification (2-5 business days)</h4>
+                <p>Our compliance team will:</p>
+                <ul>
+                    <li>✓ Verify all submitted documents</li>
+                    <li>✓ Conduct entity due diligence</li>
+                    <li>✓ Request additional information if needed</li>
+                    <li>✓ Provide verification status updates via email</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 4: In-Person Corporate Verification (Optional)</h4>
+                <p>For high-value accounts or if required by compliance:</p>
+                <ul>
+                    <li>✓ Schedule appointment at Facilon office</li>
+                    <li>✓ Bring original documents for verification</li>
+                    <li>✓ Meet with corporate relationship manager</li>
+                    <li>✓ Sign corporate agreements</li>
+                </ul>
+                <p><a href="{{baseUrl}}/corporate/appointments">Schedule Appointment →</a></p>
+            </div>
+
+            <div class="step-box">
+                <h4>Step 5: Account Activation & Investment (1-2 days)</h4>
+                <p>Once verification is complete:</p>
+                <ul>
+                    <li>✓ Corporate account will be activated</li>
+                    <li>✓ Investment limits will be assigned</li>
+                    <li>✓ Access to investment opportunities</li>
+                    <li>✓ Dedicated relationship manager assigned</li>
+                    <li>✓ Begin corporate investment journey</li>
+                </ul>
+            </div>
+
+            <div class="benefits-box">
+                <h3>🌟 Corporate Services & Benefits:</h3>
+                <p>As a corporate client, you'll receive:</p>
+                <ul>
+                    <li>✓ Dedicated Corporate Relationship Manager</li>
+                    <li>✓ Priority customer support</li>
+                    <li>✓ Customized investment solutions</li>
+                    <li>✓ Comprehensive reporting and analytics</li>
+                    <li>✓ Tax optimization advisory</li>
+                    <li>✓ Compliance management support</li>
+                    <li>✓ Corporate dashboard with multi-user access</li>
+                    <li>✓ API integration (for institutional clients)</li>
+                </ul>
+            </div>
+
+            <div class="benefits-box">
+                <h3>📊 Investment Options Available:</h3>
+                <ul>
+                    <li>✓ Equity investments (stocks, IPOs)</li>
+                    <li>✓ Fixed income securities (bonds, debentures)</li>
+                    <li>✓ Mutual funds and ETFs</li>
+                    <li>✓ Portfolio Management Services (PMS)</li>
+                    <li>✓ Alternative Investment Funds (AIFs)</li>
+                    <li>✓ Structured products</li>
+                    <li>✓ Advisory services</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{loginUrl}}" class="button">Login to Corporate Account</a>
+            </div>
+
+            <div class="success-box">
+                <h4>💬 Need Assistance?</h4>
+                <p>Our corporate support team is here to help:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Corporate Portal:</strong> <a href="{{baseUrl}}/corporate">{{baseUrl}}/corporate</a><br>
+                    <strong>Live Chat:</strong> <a href="{{baseUrl}}/corporate/support">{{baseUrl}}/corporate/support</a>
+                </p>
+                <p><strong>Resources:</strong></p>
+                <ul>
+                    <li><a href="{{baseUrl}}/resources/corporate-onboarding">Corporate Onboarding Guide</a></li>
+                    <li><a href="{{baseUrl}}/resources/corporate-kyc">Document Checklist</a></li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <h4>⚠️ Important Reminders:</h4>
+                <ul>
+                    <li>Complete profile and upload documents within 30 days</li>
+                    <li>Respond promptly to verification requests</li>
+                    <li>Keep authorized signatory details updated</li>
+                    <li>Maintain valid PAN and registration certificates</li>
+                </ul>
+            </div>
+
+            <p>We're excited to partner with <strong>{{entityName}}</strong> for your investment needs!</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Corporate Services Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Questions? Contact us at {{supportEmail}}</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Required - Investor OCI Missing</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 24px;}
+        .content {padding: 30px;}
+        .warning-box {background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .warning-box h3 {margin-top: 0; color: #856404;}
+        .impact-box {background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .action-box {background-color: #d1ecf1; border-left: 4px solid #0c5460; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .resources-box {background-color: #d4edda; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+        ul {margin: 10px 0; padding-left: 20px;}
+        li {margin: 5px 0;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⚠️ Action Required</h1>
+            <p style="margin: 5px 0;">Investor OCI Card Missing</p>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{spName}}</strong>,</p>
+            
+            <p>This is an important notification regarding an investor you introduced to Facilon Platform.</p>
+
+            <div class="warning-box">
+                <h3>📋 Investor Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Name:</strong></td>
+                        <td style="padding: 5px 0;">{{investorName}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Email:</strong></td>
+                        <td style="padding: 5px 0;">{{investorEmail}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Registration Date:</strong></td>
+                        <td style="padding: 5px 0;">Just now</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Issue:</strong></td>
+                        <td style="padding: 5px 0; color: #ffc107; font-weight: bold;">OCI Card Not Available</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Investor Type:</strong></td>
+                        <td style="padding: 5px 0;">Person of Indian Origin</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Status:</strong></td>
+                        <td style="padding: 5px 0;">Registration Incomplete</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="impact-box">
+                <h3>⚠️ Impact Without OCI:</h3>
+                <p>The investor you introduced has indicated they are of Indian origin but do not have an OCI (Overseas Citizen of India) Card. While OCI is not strictly mandatory, it provides significant benefits for investment in India.</p>
+                <ul>
+                    <li>⚠️ Limited investment options (FPI route may be required)</li>
+                    <li>⚠️ Additional RBI approvals needed for certain transactions</li>
+                    <li>⚠️ More complex compliance requirements</li>
+                    <li>⚠️ Higher documentation burden</li>
+                    <li>⚠️ Longer processing times for transactions</li>
+                </ul>
+            </div>
+
+            <h3>📌 Recommended Actions:</h3>
+
+            <div class="action-box">
+                <h4>Option 1: Assist Investor in Obtaining OCI (Recommended)</h4>
+                
+                <p><strong>Benefits of OCI:</strong></p>
+                <ul>
+                    <li>✓ Invest on repatriation basis (like NRIs)</li>
+                    <li>✓ No RBI approval needed for most investments</li>
+                    <li>✓ Can open NRO/NRE accounts easily</li>
+                    <li>✓ Lifelong multiple entry visa to India</li>
+                    <li>✓ Can purchase property (except agricultural land)</li>
+                </ul>
+
+                <p><strong>Application Process:</strong></p>
+                <ol>
+                    <li>Apply online: <a href="https://www.ociservices.gov.in">https://www.ociservices.gov.in</a></li>
+                    <li>Submit documents at Indian Embassy/VFS Center</li>
+                    <li>Processing time: 4-6 weeks</li>
+                    <li>Fee: $100-$275 (varies by country)</li>
+                </ol>
+            </div>
+
+            <div class="action-box">
+                <h4>Option 2: Continue as Foreign National</h4>
+                <p>If the investor chooses not to apply for OCI:</p>
+                <ul>
+                    <li>They can invest as a foreign national</li>
+                    <li>FPI (Foreign Portfolio Investor) registration may be required</li>
+                    <li>Additional FEMA compliance needed</li>
+                    <li>Some investment restrictions apply</li>
+                    <li>We can assist with alternative onboarding</li>
+                </ul>
+            </div>
+
+            <h3>🚀 Next Steps:</h3>
+            <ol>
+                <li>Contact the investor: <strong>{{investorEmail}}</strong></li>
+                <li>Discuss OCI benefits and application process</li>
+                <li>Decide on:
+                    <ul>
+                        <li>a) Apply for OCI (recommended) - registration on hold</li>
+                        <li>b) Continue as foreign national - different process</li>
+                    </ul>
+                </li>
+                <li>Inform us of the investor's decision</li>
+            </ol>
+
+            <div class="resources-box">
+                <h4>📚 Support Resources:</h4>
+                <p>We have sent detailed OCI information to the investor. Additional resources:</p>
+                <ul>
+                    <li>OCI Application Guide: <a href="{{baseUrl}}/resources/oci-guide">{{baseUrl}}/resources/oci-guide</a></li>
+                    <li>Foreign Investor Guide: <a href="{{baseUrl}}/resources/foreign-investor">{{baseUrl}}/resources/foreign-investor</a></li>
+                    <li>Service Provider Portal: <a href="{{baseUrl}}/sp/dashboard">{{baseUrl}}/sp/dashboard</a></li>
+                </ul>
+                <p><strong>Note:</strong> The investor's registration is currently on hold pending decision on OCI application or alternative path.</p>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="{{baseUrl}}/sp/dashboard" class="button">Go to SP Dashboard</a>
+            </div>
+
+            <div class="warning-box">
+                <h4>💬 Need Assistance?</h4>
+                <p>For guidance on handling this case:</p>
+                <p>
+                    <strong>Email:</strong> {{supportEmail}}<br>
+                    <strong>Phone:</strong> {{supportPhone}}<br>
+                    <strong>Service Provider Support:</strong> <a href="{{baseUrl}}/sp/support">{{baseUrl}}/sp/support</a>
+                </p>
+            </div>
+
+            <p>Thank you for assisting the investor in making an informed decision.</p>
+
+            <p>Best regards,<br>
+            <strong>Facilon Compliance Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification. Please follow up with the investor.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,105 @@
+server:
+  port: 8080                 # Port on which the Spring Boot application will run
+  servlet:
+    context-path: /FacilonApiServer # Context path for the application endpoints
+  ssl:
+    enabled: true
+    key-store: classpath:wildcard_logiai_com.pfx
+    key-store-password: 123456789
+    key-store-type: JKS
+    key-store-provider: SUN
+
+
+
+client:
+  port: 4200
+  host: localhost
+
+
+app:
+  cors_origins_url: https://${client.host}:${client.port}
+  client_url: https://${client.host}:${client.port}
+  security:
+    jwtTokenExpirationInMills: 604800000
+    jwtSecret: k2SId+qxOCWNmeptM4Y0hK7ncitTcB+zMXa50pe5Ldc=
+    maxLoginFailureCount: 3
+    passwordExpiryInDays: 30
+    passwordExpiryInDays1: 40
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/facilon?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true  # JDBC URL for MySQL database
+    username: root                            # Username for the MySQL database
+    password: root                            # Password for the MySQL database
+    driver-class-name: com.mysql.cj.jdbc.Driver           # JDBC driver class for MySQL
+  security:
+    enable: true
+    require-ssl: true
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+  jpa:
+    hibernate:
+      ddl-auto: update  # Hibernate schema generation strategy (e.g., update, create-drop)
+  liquibase:
+    enabled: false
+    change-log: classpath:/db/db.changelog-master.xml
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+
+management:
+  endpoint:
+    health:
+      enabled: true       # Enable Actuator health endpoint
+  endpoints:
+    web:
+      exposure:
+        include: health  # Expose Actuator health endpoint
+
+springdoc:
+  api-docs:
+    path: /facilon-api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.myapp: DEBUG
+  file:
+    name: app.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %level - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+graph:
+  email:
+    enabled: true
+    tenant-id: ${GRAPH_EMAIL_TENANT_ID:}
+    client-id: ${GRAPH_EMAIL_CLIENT_ID:}
+    client-secret: ${GRAPH_EMAIL_CLIENT_SECRET:}
+    sender-email: ${GRAPH_EMAIL_SENDER:no-reply@facilonservices.com}
+    sender-name: Facilon Platform
+
+ignored:
+  httpUrl:
+    - /api/login
+    - /swagger-ui/**
+    - /facilon-api-docs/**
+    - /swagger-ui.html
+    - /api/users/register
+    - /api/users/forgot-password
+    - /api/users/reset-password
+    - /actuator/health
+    - /api/users/checkEmail
+    - /api/admin/register
+    - /api/clients/onboarding/**
+    - /api/investor/introduced/**
+    - /api/admin/tenants/*/admin-user
+    - /api/admin/users/*/roles/*
+    - /api/super-admin/migrate-tenants
