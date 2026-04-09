@@ -973,7 +973,7 @@ public class InvestorProgressService {
                                 .physicalSubmissionMethod(physicalSubmission != null ? physicalSubmission.getPhysicalSubmission() : null)
                                 .courierName(physicalSubmission != null ? physicalSubmission.getCourierName() : null)
                                 .dispatchDate(physicalSubmission != null && physicalSubmission.getDispatchDate() != null
-                                                ? physicalSubmission.getDispatchDate().toString()
+                                                ? physicalSubmission.getDispatchDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))
                                                 : null)
                                 .awbNumber(physicalSubmission != null ? physicalSubmission.getAwbNumber() : null)
                                 .completionPercentage(calculateCompletionPercentage(infoStatus))

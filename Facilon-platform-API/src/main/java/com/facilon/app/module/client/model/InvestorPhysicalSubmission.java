@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -42,7 +41,7 @@ public class InvestorPhysicalSubmission extends TenantEntity {
     private String courierName;
 
     @Column(name = "dispatch_date")
-    private LocalDate dispatchDate;
+    private LocalDateTime dispatchDate;
 
     // Air Waybill number for tracking
     @Column(name = "awb_number", columnDefinition = "TEXT")

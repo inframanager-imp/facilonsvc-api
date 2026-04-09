@@ -39,6 +39,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -71,6 +72,23 @@ public class VerificationService {
 
         log.info("Recording physical submission for investor: {}", uniqueCode);
 
+        // Conditional validation (matches Laravel's required_if:physical_submission,courier)
+        boolean isCourier = "courier".equalsIgnoreCase(dto.getPhysicalSubmission());
+        if (isCourier) {
+            if (dto.getCourierName() == null || dto.getCourierName().isBlank()) {
+                throw new IllegalArgumentException("Courier Name is required.");
+            }
+            if (dto.getDispatchDate() == null || dto.getDispatchDate().isBlank()) {
+                throw new IllegalArgumentException("Dispatch Date is required.");
+            }
+            if (dto.getAwbNumber() == null || dto.getAwbNumber().isBlank()) {
+                throw new IllegalArgumentException("AWB Number is required.");
+            }
+        }
+
+        // Parse dispatch date (accepts both "yyyy-MM-dd" and "yyyy-MM-dd'T'HH:mm")
+        LocalDateTime dispatchDateTime = parseDispatchDate(dto.getDispatchDate());
+
         // Check if submission already exists
         InvestorPhysicalSubmission existingSubmission = physicalSubmissionRepository
                 .findByInvestorUniqueId(uniqueCode)
@@ -79,69 +97,97 @@ public class VerificationService {
         if (existingSubmission != null) {
             // Update existing submission
             existingSubmission.setPhysicalSubmission(dto.getPhysicalSubmission());
-            existingSubmission.setCourierName(dto.getCourierName());
-            if (dto.getDispatchDate() != null) {
-                existingSubmission.setDispatchDate(LocalDate.parse(dto.getDispatchDate()));
-            }
-            existingSubmission.setAwbNumber(dto.getAwbNumber());
+            existingSubmission.setPhysicalSubmissionValue(dto.getPhysicalSubmission());
+            existingSubmission.setCourierName(isCourier ? dto.getCourierName() : null);
+            existingSubmission.setDispatchDate(isCourier ? dispatchDateTime : null);
+            existingSubmission.setAwbNumber(isCourier ? dto.getAwbNumber() : null);
             physicalSubmissionRepository.save(existingSubmission);
         } else {
             // Create new submission
             InvestorPhysicalSubmission submission = InvestorPhysicalSubmission.builder()
                     .investorUniqueId(uniqueCode)
                     .physicalSubmission(dto.getPhysicalSubmission())
-                    .courierName(dto.getCourierName())
-                    .dispatchDate(dto.getDispatchDate() != null ? LocalDate.parse(dto.getDispatchDate()) : null)
-                    .awbNumber(dto.getAwbNumber())
+                    .physicalSubmissionValue(dto.getPhysicalSubmission())
+                    .courierName(isCourier ? dto.getCourierName() : null)
+                    .dispatchDate(isCourier ? dispatchDateTime : null)
+                    .awbNumber(isCourier ? dto.getAwbNumber() : null)
                     .build();
             physicalSubmissionRepository.save(submission);
         }
 
         log.info("Physical submission recorded successfully");
-        
+
         // Send email notification if courier is selected
-        if ("courier".equalsIgnoreCase(dto.getPhysicalSubmission()) && graphEmailService != null) {
+        if (isCourier && graphEmailService != null) {
             try {
-                sendCourierDispatchEmail(investor, dto);
+                sendCourierDispatchEmail(investor, dto, dispatchDateTime);
             } catch (Exception e) {
                 log.error("Failed to send courier dispatch email for investor {}: {}", uniqueCode, e.getMessage(), e);
                 // Don't fail the transaction if email fails
             }
         }
     }
+
+    /**
+     * Parse dispatch date from frontend. Accepts:
+     *   - "yyyy-MM-dd'T'HH:mm"  (HTML datetime-local input)
+     *   - "yyyy-MM-dd'T'HH:mm:ss"
+     *   - "yyyy-MM-dd"          (date-only fallback; time set to 00:00)
+     */
+    private LocalDateTime parseDispatchDate(String input) {
+        if (input == null || input.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(input);
+        } catch (DateTimeParseException ignored) {
+            // Not ISO local date time — try date-only
+        }
+        try {
+            return LocalDateTime.parse(input, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
+        } catch (DateTimeParseException ignored) {
+            // try yyyy-MM-dd
+        }
+        try {
+            return LocalDate.parse(input).atStartOfDay();
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid Dispatch Date format. Expected yyyy-MM-dd'T'HH:mm.");
+        }
+    }
     
     /**
      * Send courier dispatch email to service provider
      */
-    private void sendCourierDispatchEmail(Investor investor, PhysicalSubmissionDto dto) {
+    private void sendCourierDispatchEmail(Investor investor, PhysicalSubmissionDto dto, LocalDateTime dispatchDateTime) {
         log.info("Sending courier dispatch email for investor: {}", investor.getUniqueCode());
-        
+
         // Get authorized user for investor (via relationship)
         AuthorizedUser user = investor.getAuthorizedUser();
         if (user == null) {
             throw new RuntimeException("User not found for investor");
         }
-        
+
         // Get intro investor temp to get broker and product details
         IntroInvestorTemp intro = introInvestorTempRepository.findByUniqueCodeDb(investor.getUniqueCode())
                 .orElseThrow(() -> new RuntimeException("Intro investor not found"));
-        
+
         // Get broker/service provider details
         MasterAccounts broker = masterAccountsRepository.findFirstBySsBrokerValue(intro.getSsBrokerValue())
                 .orElseThrow(() -> new RuntimeException("Service provider not found"));
-        
+
         if (broker.getEmailAddress1() == null || broker.getEmailAddress1().isBlank()) {
             throw new RuntimeException("Service provider email not found");
         }
-        
-        // Build investor full name (simple - no middle name in AuthorizedUser)
-        String investorFullName = buildFullName(user);
-        
+
+        // Build investor full name (first + middle + last, matching Laravel's users table concat).
+        // AuthorizedUser has no middle_name column, so the middle name is pulled from intro_investor_temp.
+        String investorFullName = buildFullName(user, intro);
+
         // Format dispatch date for email display (d/m/Y H:i format like Laravel)
-        String dispatchDateFormatted = dto.getDispatchDate() != null
-                ? LocalDate.parse(dto.getDispatchDate()).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+        String dispatchDateFormatted = dispatchDateTime != null
+                ? dispatchDateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                 : "";
-        
+
         // Prepare email template variables
         Map<String, String> variables = new HashMap<>();
         variables.put("serviceProviderName", broker.getName() != null ? broker.getName() : "Service Provider");
@@ -174,18 +220,35 @@ public class VerificationService {
     }
     
     /**
-     * Build full name from authorized user (first + last only, no middle name in AuthorizedUser)
+     * Build full name matching Laravel: first + middle + last.
+     * AuthorizedUser has no middle name, so it falls back to IntroInvestorTemp.intro_middle_name.
      */
-    private String buildFullName(AuthorizedUser user) {
-        String fullName = "";
-        if (user.getFirstName() != null && !user.getFirstName().isBlank()) {
-            fullName += user.getFirstName();
+    private String buildFullName(AuthorizedUser user, IntroInvestorTemp intro) {
+        StringBuilder fullName = new StringBuilder();
+        String firstName = user.getFirstName();
+        if ((firstName == null || firstName.isBlank()) && intro != null) {
+            firstName = intro.getIntroFirstName();
         }
-        if (user.getLastName() != null && !user.getLastName().isBlank()) {
-            if (!fullName.isEmpty()) fullName += " ";
-            fullName += user.getLastName();
+        if (firstName != null && !firstName.isBlank()) {
+            fullName.append(firstName.trim());
         }
-        return fullName.isBlank() ? "Investor" : fullName.trim();
+
+        String middleName = intro != null ? intro.getIntroMiddleName() : null;
+        if (middleName != null && !middleName.isBlank()) {
+            if (fullName.length() > 0) fullName.append(' ');
+            fullName.append(middleName.trim());
+        }
+
+        String lastName = user.getLastName();
+        if ((lastName == null || lastName.isBlank()) && intro != null) {
+            lastName = intro.getIntroLastName();
+        }
+        if (lastName != null && !lastName.isBlank()) {
+            if (fullName.length() > 0) fullName.append(' ');
+            fullName.append(lastName.trim());
+        }
+
+        return fullName.length() == 0 ? "Investor" : fullName.toString();
     }
 
     @Transactional
@@ -286,7 +349,7 @@ public class VerificationService {
                 .physicalSubmission(physicalSubmission != null ? physicalSubmission.getPhysicalSubmission() : null)
                 .courierName(physicalSubmission != null ? physicalSubmission.getCourierName() : null)
                 .dispatchDate(physicalSubmission != null && physicalSubmission.getDispatchDate() != null
-                        ? physicalSubmission.getDispatchDate().toString()
+                        ? physicalSubmission.getDispatchDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))
                         : null)
                 .build();
 

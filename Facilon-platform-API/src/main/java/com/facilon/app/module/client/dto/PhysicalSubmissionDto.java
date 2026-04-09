@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Data
 @Builder
@@ -18,8 +19,10 @@ public class PhysicalSubmissionDto {
     private String physicalSubmission; // "inperson" or "courier"
 
     // Courier-specific fields (required if physicalSubmission = "courier")
+    @Size(max = 100, message = "Courier Name should not exceed 100 characters")
     private String courierName;
     private String dispatchDate; // Format: "yyyy-MM-dd" or "yyyy-MM-ddTHH:mm"
+    @Size(max = 50, message = "AWB Number should not exceed 50 characters")
     private String awbNumber;
 
     // Additional fields
