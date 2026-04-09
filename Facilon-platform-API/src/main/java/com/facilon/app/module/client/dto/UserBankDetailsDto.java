@@ -31,4 +31,11 @@ public class UserBankDetailsDto {
     private String rbiApproval;
     private String rbiApprovalOrderNumber;
     private String rbiApprovalDate;
+
+    // Laravel parity: structured bank branch address
+    private String bankDetailsCity;
+    private String bankDetailsState;
+    private String bankDetailsCountry;
+    private String bankDetailsZipCode;
+    private String bankDetailsMicr;
 }

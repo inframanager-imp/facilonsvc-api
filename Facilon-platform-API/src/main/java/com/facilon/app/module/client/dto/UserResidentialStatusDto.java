@@ -15,6 +15,14 @@ import lombok.NoArgsConstructor;
 public class UserResidentialStatusDto {
 
     private String residentialStatus;
+    // Laravel parity
+    private String personOrigin;          // Person of Indian Origin (yes/no)
+    private String proofOfAddress;
+    private String aadharNumberOption;    // yes/no
+    private String aadharNumber;
+    private String userAadharNo;
+    private String ociAvailable;          // yes/no
+    private String dateOfOci;
     private String addressProofType;
     private String addressLine1;
     private String addressLine2;

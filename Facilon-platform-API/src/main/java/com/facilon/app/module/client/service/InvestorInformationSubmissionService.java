@@ -1,12 +1,15 @@
 package com.facilon.app.module.client.service;
 
+import com.facilon.app.config.TenantContextHolder;
 import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.integration.sharepoint.SharePointService;
 import com.facilon.app.module.client.model.Investor;
 import com.facilon.app.module.client.model.IntroInvestorTemp;
+import com.facilon.app.module.client.model.KycDocuments;
 import com.facilon.app.module.client.model.UserPersonalInformation;
 import com.facilon.app.module.client.repository.IntroInvestorTempRepository;
 import com.facilon.app.module.client.repository.InvestorRepository;
+import com.facilon.app.module.client.repository.KycDocumentsRepository;
 import com.facilon.app.module.client.repository.UserPersonalInformationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,10 @@ public class InvestorInformationSubmissionService {
     private final InvestorRepository investorRepository;
     private final UserPersonalInformationRepository personalInfoRepository;
     private final IntroInvestorTempRepository introInvestorTempRepository;
+    private final KycDocumentsRepository kycDocumentsRepository;
+
+    /** Document type label used for the final-submission "Investor Information" row in kyc_documents. */
+    private static final String INVESTOR_INFO_DOC_TYPE = "Investor Information";
 
     @Value("${dataverse.sharepoint.parent-location-id:112fd6a2-12f1-f011-8406-7ced8d285638}")
     private String parentLocationId;
@@ -94,11 +101,11 @@ public class InvestorInformationSubmissionService {
             log.info("Creating SharePoint folder");
             String folderId = sharePointService.createFolder(folderName);
 
-            // Upload PDF
-            String pdfFileName = "Investor_Application_Status1.pdf";
+            // Upload PDF (filename aligned with Laravel: Investor_Application_Status.pdf)
+            String pdfFileName = "Investor_Application_Status.pdf";
             log.info("Uploading PDF to SharePoint");
             sharePointService.uploadFileToFolder(folderId, pdfFileName, pdfBytes);
-            
+
             String fullDocumentUrl = sharePointBaseUrl + "/" + folderName;
             log.info("PDF uploaded: {}", fullDocumentUrl);
 
@@ -110,6 +117,17 @@ public class InvestorInformationSubmissionService {
             personalInfo.setUpdatedAt(LocalDateTime.now());
             personalInfoRepository.save(personalInfo);
 
+            // Upsert kyc_documents row for the "Investor Information" document
+            // (Laravel InnerPageController.php lines 4747-4763). This keeps the
+            // local document listing in sync with the SharePoint upload so the
+            // dashboard / account-details pages show the final-submission PDF.
+            upsertInvestorInformationKycRow(
+                    uniqueCode,
+                    investorGuid,
+                    fullDocumentUrl,
+                    investorDocumentId
+            );
+
             // Update Dataverse document
             log.info("Updating Dataverse document record");
             dynamicsCrmService.updateInvestorDocumentUrl(investorDocumentId, fullDocumentUrl);
@@ -118,6 +136,15 @@ public class InvestorInformationSubmissionService {
             log.info("Creating SharePoint document location");
             dynamicsCrmService.createSharePointDocumentLocation(
                     investorDocumentId, folderName, parentLocationId, siteCollectionId);
+
+            // Mark the Dataverse investor record as having personal details filled
+            // (Laravel lines 4853-4861: PATCH /ss_investors({investorId}) → ss_investorpersonaldetailsfilled=true)
+            try {
+                dynamicsCrmService.updateInvestorPersonalDetailsFilled(investorGuid);
+            } catch (Exception e) {
+                log.warn("Failed to PATCH ss_investors personal-details-filled flag for {}: {}",
+                        investorGuid, e.getMessage());
+            }
 
             // Send email notification using template 20-final-submission.html
             try {
@@ -143,6 +170,52 @@ public class InvestorInformationSubmissionService {
         } catch (Exception e) {
             log.error("Final submission failed for {}: {}", uniqueCode, e.getMessage(), e);
             throw new RuntimeException("Final submission failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Upsert the local {@code kyc_documents} row that represents the
+     * "Investor Information" final-submission PDF.
+     *
+     * Mirrors Laravel {@code InnerPageController.investor_details_final_submit}
+     * lines 4747-4763 — match by {@code document_type='Investor Information'}
+     * OR {@code document_master_id=<ss_investordocumentsid>}; if a row exists
+     * update it in place, otherwise insert a new one.
+     */
+    private void upsertInvestorInformationKycRow(String investorUniqueId,
+                                                 String ssInvestorId,
+                                                 String documentUrl,
+                                                 String investorDocumentId) {
+        try {
+            var tenant = TenantContextHolder.getContext().getTenant();
+
+            KycDocuments row = kycDocumentsRepository
+                    .findInvestorInformationRecord(investorUniqueId, INVESTOR_INFO_DOC_TYPE, investorDocumentId)
+                    .orElseGet(() -> {
+                        KycDocuments k = KycDocuments.builder()
+                                .investorUniqueId(investorUniqueId)
+                                .documentType(INVESTOR_INFO_DOC_TYPE)
+                                .uploadType(1)
+                                .build();
+                        k.setTenant(tenant);
+                        return k;
+                    });
+
+            row.setSsInvestorId(ssInvestorId);
+            row.setStatus("Submitted");
+            row.setDocumentUrl(documentUrl);
+            row.setDocumentType(INVESTOR_INFO_DOC_TYPE);
+            row.setDocumentMasterId(investorDocumentId);
+            if (row.getTenant() == null) {
+                row.setTenant(tenant);
+            }
+
+            kycDocumentsRepository.save(row);
+            log.info("kyc_documents upserted for Investor Information (investorUniqueId={})", investorUniqueId);
+        } catch (Exception e) {
+            // Non-fatal — SharePoint/Dataverse state is authoritative; local row is a mirror.
+            log.error("Failed to upsert kyc_documents Investor Information row for {}: {}",
+                    investorUniqueId, e.getMessage(), e);
         }
     }
 }

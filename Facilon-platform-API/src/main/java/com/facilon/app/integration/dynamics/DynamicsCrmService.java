@@ -1049,6 +1049,64 @@ public class DynamicsCrmService {
     }
 
     /**
+     * PATCH {@code ss_investors({investorGuid})} to mark personal details as filled.
+     * Mirrors Laravel {@code InnerPageController.investor_details_final_submit} lines 4853-4861:
+     *
+     * <pre>
+     *   PATCH /ss_investors({investorId})
+     *   {
+     *     "ss_investorpersonaldetailsfilled": true
+     *   }
+     * </pre>
+     *
+     * Non-fatal — logs and swallows errors so the rest of the final-submit flow can complete.
+     */
+    public void updateInvestorPersonalDetailsFilled(String investorGuid) {
+        if (investorGuid == null || investorGuid.isBlank()) {
+            log.warn("updateInvestorPersonalDetailsFilled: investorGuid is null/blank, skipping");
+            return;
+        }
+        log.info("Updating Dataverse ss_investors({}) — ss_investorpersonaldetailsfilled=true", investorGuid);
+
+        if (tokenProvider == null) {
+            log.warn("tokenProvider is null, skipping ss_investors update");
+            return;
+        }
+
+        String accessToken = tokenProvider.getDynamicsToken();
+        String baseUrl = tokenProvider.getDynamicsBaseUrl();
+        if (accessToken == null || baseUrl == null) {
+            log.warn("Dynamics config not available, skipping ss_investors update");
+            return;
+        }
+
+        URI uri = URI.create(baseUrl + "/ss_investors(" + investorGuid + ")");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("OData-MaxVersion", "4.0");
+        headers.set("OData-Version", "4.0");
+
+        Map<String, Object> patchData = new java.util.HashMap<>();
+        patchData.put("ss_investorpersonaldetailsfilled", true);
+
+        try {
+            restTemplate.exchange(
+                    uri,
+                    HttpMethod.PATCH,
+                    new HttpEntity<>(patchData, headers),
+                    Void.class
+            );
+            log.info("✅ ss_investors({}).ss_investorpersonaldetailsfilled set to true", investorGuid);
+        } catch (Exception e) {
+            // Non-fatal: downstream workflow may be slightly out of sync, but local
+            // finalSubmit succeeded and can be retried.
+            log.error("❌ Failed to PATCH ss_investors({}): {}", investorGuid, e.getMessage());
+        }
+    }
+
+    /**
      * Fetch document master ID for "Investor Information" document type.
      */
     public String fetchDocumentMasterIdForInvestorInfo(String brokerGuid) {

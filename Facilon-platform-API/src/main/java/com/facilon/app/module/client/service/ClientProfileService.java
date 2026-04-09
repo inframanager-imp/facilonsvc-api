@@ -15,6 +15,11 @@ import com.facilon.app.module.client.model.InvestorTaxInformation;
 import com.facilon.app.module.client.model.InvestorBankDetails;
 import com.facilon.app.module.client.model.UserPassportDetails;
 import com.facilon.app.module.client.model.UserPersonalInformation;
+import com.facilon.app.module.client.model.IntroInvestorTemp;
+import com.facilon.app.module.client.model.master.MasterAccounts;
+import com.facilon.app.module.client.model.master.MasterBanks;
+import com.facilon.app.module.client.model.master.MasterBrokerBanks;
+import com.facilon.app.module.client.repository.IntroInvestorTempRepository;
 import com.facilon.app.module.client.repository.InvestorBankDetailsRepository;
 import com.facilon.app.module.client.repository.InvestorContactDetailsRepository;
 import com.facilon.app.module.client.repository.InvestorConsentsRepository;
@@ -25,6 +30,9 @@ import com.facilon.app.module.client.repository.InvestorResidentialStatusReposit
 import com.facilon.app.module.client.repository.InvestorRiskProfileRepository;
 import com.facilon.app.module.client.repository.InvestorTaxInformationRepository;
 import com.facilon.app.module.client.repository.KycDocumentsRepository;
+import com.facilon.app.module.client.repository.MasterAccountsRepository;
+import com.facilon.app.module.client.repository.MasterBanksRepository;
+import com.facilon.app.module.client.repository.MasterBrokerBanksRepository;
 import com.facilon.app.module.client.repository.UserPassportDetailsRepository;
 import com.facilon.app.module.client.repository.UserPersonalInformationRepository;
 import com.facilon.app.module.client.repository.InvestorInformationStatusRepository;
@@ -61,6 +69,12 @@ public class ClientProfileService {
     private final KycDocumentsRepository kycDocumentsRepository;
     private final InvestorNotificationService notificationService;
     private final InvestorInformationStatusRepository statusRepository;
+
+    // Preferred-bank resolver chain (Laravel parity: broker_prefferedbank → master_broker_banks → master_banks → master_accounts)
+    private final IntroInvestorTempRepository introInvestorTempRepository;
+    private final MasterBrokerBanksRepository masterBrokerBanksRepository;
+    private final MasterBanksRepository masterBanksRepository;
+    private final MasterAccountsRepository masterAccountsRepository;
     
     @Autowired(required = false)
     private DynamicsCrmService dynamicsCrmService;
@@ -833,6 +847,12 @@ public class ClientProfileService {
         bank.setRbiApproval(dto.getRbiApproval());
         bank.setRbiApprovalOrderNumber(dto.getRbiApprovalOrderNumber());
         bank.setRbiApprovalDate(dto.getRbiApprovalDate());
+        // Laravel parity: structured bank branch address
+        bank.setBankDetailsCity(dto.getBankDetailsCity());
+        bank.setBankDetailsState(dto.getBankDetailsState());
+        bank.setBankDetailsCountry(dto.getBankDetailsCountry());
+        bank.setBankDetailsZipCode(dto.getBankDetailsZipCode());
+        bank.setBankDetailsMicr(dto.getBankDetailsMicr());
         bank.setIsPrimary(Boolean.TRUE.equals(dto.getIsPrimaryAccount()) || Boolean.TRUE.equals(dto.getIsPrimary()));
         bank.setTenant(tenant);
         bank = bankDetailsRepository.save(bank);
@@ -843,6 +863,69 @@ public class ClientProfileService {
         updateSectionStatus(investor, "bankDetails");
 
         return toBankDto(bank);
+    }
+
+    /**
+     * Resolve the broker's preferred-bank display name.
+     *
+     * Laravel chain (information-update.blade.php lines 1653-1674):
+     * <pre>
+     *   intro_investor_temp.broker_prefferedbank  →  ss_brokerbankid
+     *      → master_broker_banks.ss_bank_value    →  ss_bankid
+     *        → master_banks.ss_nameofbank         →  accountid
+     *          → master_accounts.name             →  display name
+     * </pre>
+     *
+     * Returns null when any step in the chain is missing. Only applies when
+     * the service provider type is {@code 100000000} (Broker).
+     */
+    public Optional<PreferredBankDto> getPreferredBankName(Long userId) {
+        Investor investor = getInvestorForUser(userId);
+
+        // Find the intro_investor_temp record for this investor
+        IntroInvestorTemp intro = introInvestorTempRepository
+                .findByUniqueCodeDb(investor.getUniqueCode())
+                .orElse(null);
+
+        if (intro == null) {
+            return Optional.empty();
+        }
+
+        // Laravel only resolves when service_provider_type == 100000000 (Broker)
+        String spType = intro.getServiceProviderType();
+        boolean isBroker = "100000000".equals(spType);
+
+        String brokerPreferredBankId = intro.getBrokerPreferredBank();
+        if (brokerPreferredBankId == null || brokerPreferredBankId.isBlank()) {
+            return Optional.of(PreferredBankDto.builder().isBroker(isBroker).build());
+        }
+
+        // Step 1: master_broker_banks
+        MasterBrokerBanks brokerBank = masterBrokerBanksRepository
+                .findFirstBySsBrokerBankId(brokerPreferredBankId)
+                .orElse(null);
+        if (brokerBank == null || brokerBank.getSsBankValue() == null) {
+            return Optional.of(PreferredBankDto.builder().isBroker(isBroker).build());
+        }
+
+        // Step 2: master_banks (look up by ss_bankid = brokerBank.ss_bank_value)
+        MasterBanks bank = masterBanksRepository
+                .findFirstBySsBankId(brokerBank.getSsBankValue())
+                .orElse(null);
+        if (bank == null || bank.getSsNameOfBank() == null) {
+            return Optional.of(PreferredBankDto.builder().isBroker(isBroker).build());
+        }
+
+        // Step 3: master_accounts (look up by accountid = bank.ss_nameofbank)
+        MasterAccounts account = masterAccountsRepository
+                .findByAccountId(bank.getSsNameOfBank())
+                .orElse(null);
+        String displayName = account != null ? account.getName() : null;
+
+        return Optional.of(PreferredBankDto.builder()
+                .isBroker(isBroker)
+                .bankName(displayName)
+                .build());
     }
 
     // Contact Details

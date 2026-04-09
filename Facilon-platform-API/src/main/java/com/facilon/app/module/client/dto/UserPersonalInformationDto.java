@@ -19,6 +19,7 @@ public class UserPersonalInformationDto {
     private Long id;
     private String investorUniqueId;
     private String investorId;
+    private String nameTitle;
     private String investorFirstName;
     private String investorMiddleName;
     private String investorLastName;

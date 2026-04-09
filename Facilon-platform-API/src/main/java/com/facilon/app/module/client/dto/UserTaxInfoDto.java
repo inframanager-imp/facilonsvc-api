@@ -28,4 +28,9 @@ public class UserTaxInfoDto {
     private String taxPanFatherName;
     private String taxResidencyCertificateNo;
     private String taxResidencyCertificateDate;
+
+    // Laravel parity
+    private String taxInfo;        // tax_info selector
+    private String taxPanNo;       // separate tax PAN (distinct from personal panNumber)
+    private String usPersonFatca;  // yes/no
 }

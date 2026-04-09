@@ -162,6 +162,20 @@ public class ClientProfileController {
         return ResponseEntity.ok(updated);
     }
 
+    @GetMapping("/bank-details/preferred-bank")
+    @Operation(
+            summary = "Get broker's preferred bank",
+            description = "Resolves intro_investor_temp.broker_prefferedbank through "
+                    + "master_broker_banks → master_banks → master_accounts and returns "
+                    + "the display name. Laravel parity."
+    )
+    public ResponseEntity<PreferredBankDto> getPreferredBank(Authentication auth) {
+        Long userId = ((UserPrincipal) auth.getPrincipal()).getId();
+        return profileService.getPreferredBankName(userId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
     @GetMapping("/contact-details")
     @Operation(summary = "Get contact details")
     public ResponseEntity<UserContactDetailsDto> getContactDetails(Authentication auth) {

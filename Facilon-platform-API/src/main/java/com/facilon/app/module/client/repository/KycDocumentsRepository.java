@@ -24,4 +24,16 @@ public interface KycDocumentsRepository extends JpaRepository<KycDocuments, Long
 
     @Query("SELECT COUNT(k) FROM KycDocuments k WHERE k.investorUniqueId = :investorUniqueId AND k.uploadType = :uploadType AND k.deletedAt IS NULL")
     Integer countByInvestorUniqueIdAndUploadType(@Param("investorUniqueId") String investorUniqueId, @Param("uploadType") Integer uploadType);
+
+    /**
+     * Find the KYC row used for the final-submission "Investor Information" document,
+     * matching either by document type or by the Dataverse document-master id.
+     * Mirrors Laravel's upsert logic (InnerPageController.php lines 4749-4763).
+     */
+    @Query("SELECT k FROM KycDocuments k WHERE k.investorUniqueId = :investorUniqueId " +
+            "AND k.deletedAt IS NULL " +
+            "AND (k.documentType = :documentType OR k.documentMasterId = :documentMasterId)")
+    Optional<KycDocuments> findInvestorInformationRecord(@Param("investorUniqueId") String investorUniqueId,
+                                                         @Param("documentType") String documentType,
+                                                         @Param("documentMasterId") String documentMasterId);
 }

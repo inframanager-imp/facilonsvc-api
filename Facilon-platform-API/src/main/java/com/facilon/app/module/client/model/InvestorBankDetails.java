@@ -72,6 +72,22 @@ public class InvestorBankDetails extends TenantEntity {
     @Column(name = "rbi_approval_date")
     private String rbiApprovalDate;
 
+    // --- Structured bank branch address (Laravel parity: bank_details_*) ---
+    @Column(name = "bank_details_city", columnDefinition = "TEXT")
+    private String bankDetailsCity;
+
+    @Column(name = "bank_details_state", columnDefinition = "TEXT")
+    private String bankDetailsState;
+
+    @Column(name = "bank_details_country", columnDefinition = "TEXT")
+    private String bankDetailsCountry;
+
+    @Column(name = "bank_details_zip_code", columnDefinition = "TEXT")
+    private String bankDetailsZipCode;
+
+    @Column(name = "bank_details_micr", columnDefinition = "TEXT")
+    private String bankDetailsMicr;
+
     @Column(name = "is_primary")
     @Builder.Default
     private Boolean isPrimary = false;

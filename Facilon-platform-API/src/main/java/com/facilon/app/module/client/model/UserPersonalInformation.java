@@ -39,6 +39,10 @@ public class UserPersonalInformation extends TenantEntity {
     @Column(name = "title")
     private Integer title; // Reference to master_title
 
+    /** Free-text salutation (Laravel: name_title). Distinct from the numeric `title` master reference. */
+    @Column(name = "name_title", columnDefinition = "TEXT")
+    private String nameTitle;
+
     @Column(name = "investor_first_name")
     private String investorFirstName;
 
@@ -211,6 +215,35 @@ public class UserPersonalInformation extends TenantEntity {
 
     @Column(name = "address_type", columnDefinition = "TEXT")
     private String addressType;
+
+    // --- Residential Status block (Laravel parity) ---
+    @Column(name = "residential_status", columnDefinition = "TEXT")
+    private String residentialStatus;
+
+    @Column(name = "person_origin", columnDefinition = "TEXT")
+    private String personOrigin;
+
+    @Column(name = "aadhar_number_option", columnDefinition = "TEXT")
+    private String aadharNumberOption;
+
+    @Column(name = "aadhar_number", columnDefinition = "TEXT")
+    private String aadharNumber;
+
+    @Column(name = "oci_available", columnDefinition = "TEXT")
+    private String ociAvailable;
+
+    @Column(name = "date_of_oci")
+    private LocalDate dateOfOci;
+
+    // --- Tax block (Laravel parity) ---
+    @Column(name = "tax_info", columnDefinition = "TEXT")
+    private String taxInfo;
+
+    @Column(name = "tax_pan_no", columnDefinition = "TEXT")
+    private String taxPanNo;
+
+    @Column(name = "us_person_fatca", columnDefinition = "TEXT")
+    private String usPersonFatca;
 
     // Verification fields (for in-person verification)
     @Column(name = "ss_verification_done", columnDefinition = "TEXT")
