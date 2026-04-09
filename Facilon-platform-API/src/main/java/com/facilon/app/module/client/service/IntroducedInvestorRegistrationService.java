@@ -517,7 +517,7 @@ public class IntroducedInvestorRegistrationService {
     // ============================================
 
     /**
-     * Create B2C account - Matches Laravel lines 3182-3210
+     * Create B2C account - aligned with PublicRegistrationService.createAzureUser()
      */
     private boolean createB2CAccount(AuthorizedUser user, String password, String displayName) {
         UserMgmtApiClient userMgmtClient = userMgmtClientProvider.getIfAvailable();
@@ -533,6 +533,7 @@ public class IntroducedInvestorRegistrationService {
                 return false;
             }
 
+            // Determine correct tenant identifier — same as self-registration
             String tenantIdentifier;
             if (b2cConfig.getB2cTenantId() != null && !b2cConfig.getB2cTenantId().isEmpty()) {
                 tenantIdentifier = b2cConfig.getB2cTenantId();
@@ -542,17 +543,16 @@ public class IntroducedInvestorRegistrationService {
 
             log.info("🔐 Creating Azure B2C user with tenant: {}", tenantIdentifier);
 
+            // Build SignUpDto — aligned with self-registration (no hardcoded issuer)
             SignUpDto signUpDto = SignUpDto.builder()
                     .email(user.getEmailId())
                     .password(password)
                     .firstName(user.getFirstName())
                     .lastName(user.getLastName())
-                    .displayName(displayName)
                     .mobilePhone(user.getMobilePhone())
                     .clientId(b2cConfig.getClientId())
                     .clientSecret(b2cConfig.getClientSecret())
                     .tenantId(tenantIdentifier)
-                    .issuer("facilonservices.onmicrosoft.com")
                     .build();
 
             MicrosoftGraphResponseDto response = userMgmtClient.createUserLatest(signUpDto);
@@ -561,6 +561,7 @@ public class IntroducedInvestorRegistrationService {
                 log.info("✅ B2C account created successfully for: {}, Azure ID: {}",
                         user.getEmailId(), response.getId());
 
+                // Save Azure user ID back (better than self-registration which doesn't do this)
                 user.setAzureAdUserId(response.getId());
                 authorizedUserRepository.save(user);
 
