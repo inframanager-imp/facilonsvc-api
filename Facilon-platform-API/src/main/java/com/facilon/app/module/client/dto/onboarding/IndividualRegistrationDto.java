@@ -36,7 +36,7 @@ public class IndividualRegistrationDto {
     private LocalDate dateOfBirth;
 
     @NotBlank(message = "Gender is required")
-    private String gender; // Male, Female, Other
+    private String gender; // Male, Female, Transgender
 
     @NotNull(message = "Nationality is required")
     private Integer nationality; // Reference to master nationality
