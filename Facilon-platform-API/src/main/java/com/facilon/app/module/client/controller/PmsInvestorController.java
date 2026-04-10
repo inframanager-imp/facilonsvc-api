@@ -2,9 +2,11 @@ package com.facilon.app.module.client.controller;
 
 import com.facilon.app.module.client.dto.onboarding.PmsInvestorRegistrationDto;
 import com.facilon.app.module.client.dto.onboarding.PmsOtpRequestDto;
+import com.facilon.app.module.client.dto.onboarding.PmsOtpResponseDto;
 import com.facilon.app.module.client.dto.onboarding.PmsOtpVerifyDto;
 import com.facilon.app.module.client.dto.onboarding.VerificationResponseDto;
 import com.facilon.app.module.client.service.PmsInvestorService;
+import com.facilon.app.module.client.service.PmsOtpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ public class PmsInvestorController {
 
     private final PmsInvestorService pmsInvestorService;
     private final PmsService pmsService;
+    private final PmsOtpService pmsOtpService;
 
     @PostMapping("/register")
     @Operation(summary = "Register PMS investor")
@@ -38,20 +41,79 @@ public class PmsInvestorController {
     }
 
     @PostMapping("/send-otp")
-    @Operation(summary = "Send OTP")
-    public ResponseEntity<String> sendOtp(@RequestBody PmsOtpRequestDto dto) {
-        log.info("Sending OTP to email: {} and mobile: {}", dto.getEmail(), dto.getMobileNumber());
-        // Mock OTP send
-        return ResponseEntity.ok("OTP sent successfully");
+    @Operation(summary = "Send OTP",
+            description = "Sends a 4-digit OTP to the supplied email and mobile. "
+                    + "Rate-limited to 3 sends per 15-minute window per (email, mobile) pair. "
+                    + "Laravel parity: InvestorController.introduce_investor_pms_register_step1_submit.")
+    public ResponseEntity<PmsOtpResponseDto> sendOtp(@RequestBody PmsOtpRequestDto dto) {
+        log.info("Sending PMS OTP to email={} mobile={}", dto.getEmail(), dto.getMobileNumber());
+
+        if (dto.getEmail() == null || dto.getEmail().isBlank()
+                || dto.getMobileNumber() == null || dto.getMobileNumber().isBlank()) {
+            return ResponseEntity.badRequest().body(PmsOtpResponseDto.builder()
+                    .success(false)
+                    .code("invalid_request")
+                    .message("Email and mobile number are required.")
+                    .build());
+        }
+
+        PmsOtpService.OtpSendResult result = pmsOtpService.requestOtp(
+                dto.getEmail(), dto.getMobileNumber(), dto.getFirstName());
+
+        PmsOtpResponseDto response = PmsOtpResponseDto.builder()
+                .success(result.success)
+                .code(result.success ? "ok" : "rate_limited")
+                .message(result.message)
+                .emailSent(result.emailSent)
+                .smsSent(result.smsSent)
+                .expiresInMinutes(result.expiresInMinutes)
+                .build();
+
+        if (!result.success) {
+            return ResponseEntity.status(429).body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-otp")
-    @Operation(summary = "Verify OTP")
-    public ResponseEntity<String> verifyOtp(@RequestBody PmsOtpVerifyDto dto) {
-        log.info("Verifying OTP for email: {} and mobile: {}", dto.getEmail(), dto.getMobileNumber());
-        // Mock OTP verification - consider any 4 digit code valid for now or specific
-        // mock
-        return ResponseEntity.ok("OTP verified successfully");
+    @Operation(summary = "Verify OTP",
+            description = "Verifies the email + SMS OTP combination. "
+                    + "Enforces brute-force protection: 5 failed attempts → 15-minute lock. "
+                    + "Laravel parity: InvestorController.introduce_investor_pms_register_step2_verify_otp.")
+    public ResponseEntity<PmsOtpResponseDto> verifyOtp(@RequestBody PmsOtpVerifyDto dto) {
+        log.info("Verifying PMS OTP for email={} mobile={}", dto.getEmail(), dto.getMobileNumber());
+
+        if (dto.getEmail() == null || dto.getMobileNumber() == null
+                || dto.getEmailOtp() == null || dto.getSmsOtp() == null) {
+            return ResponseEntity.badRequest().body(PmsOtpResponseDto.builder()
+                    .success(false)
+                    .code("invalid_request")
+                    .message("Email, mobile, emailOtp and smsOtp are required.")
+                    .build());
+        }
+
+        PmsOtpService.OtpVerifyResult result = pmsOtpService.verifyOtp(
+                dto.getEmail(), dto.getMobileNumber(), dto.getEmailOtp(), dto.getSmsOtp());
+
+        PmsOtpResponseDto response = PmsOtpResponseDto.builder()
+                .success(result.success)
+                .code(result.code)
+                .message(result.message)
+                .remainingAttempts(result.remainingAttempts)
+                .build();
+
+        if (!result.success) {
+            // 423 Locked for lockout, 410 Gone for expired, 401 for mismatch / not_issued
+            int status;
+            switch (result.code) {
+                case "locked":     status = 423; break;
+                case "expired":    status = 410; break;
+                case "not_issued": status = 404; break;
+                default:           status = 401; break; // mismatch
+            }
+            return ResponseEntity.status(status).body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/registration/{uniqueCode}")

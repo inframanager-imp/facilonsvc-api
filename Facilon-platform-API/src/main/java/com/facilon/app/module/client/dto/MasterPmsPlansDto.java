@@ -21,4 +21,12 @@ public class MasterPmsPlansDto {
     private String ssPmsValue;
     private String ssPreferredBankValue;
     private String ssSchemeValue;
+
+    /**
+     * Resolved bank display name from {@code master_accounts.name} via the
+     * {@code _ss_preferredbank_value → accountid} join. Used to populate the
+     * "PMS Bank" field in the wizard when {@code master_pms_banks} has no rows
+     * synced from Dataverse yet.
+     */
+    private String preferredBankName;
 }

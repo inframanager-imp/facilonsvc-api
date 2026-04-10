@@ -16,4 +16,11 @@ public class MasterPmsBanksDto {
     private String ssPmsBankId;
     private String ssPortfolioManagerValue;
     private String ssBankValue;
+
+    /**
+     * Resolved bank display name from {@code master_accounts.name} via the
+     * {@code ss_bank_value → accountid} join. Falls back to {@link #ssName}
+     * when no master_accounts row is found.
+     */
+    private String bankName;
 }

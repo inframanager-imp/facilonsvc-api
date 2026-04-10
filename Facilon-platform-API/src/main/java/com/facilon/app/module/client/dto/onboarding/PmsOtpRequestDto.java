@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class PmsOtpRequestDto {
     private String email;
     private String mobileNumber;
+    /** Optional: used to personalize the email OTP template. */
+    private String firstName;
 }

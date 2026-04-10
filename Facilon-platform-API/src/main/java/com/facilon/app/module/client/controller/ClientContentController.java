@@ -38,6 +38,7 @@ public class ClientContentController {
     private final MasterPortfolioManagersRepository pmsManagersRepository;
     private final MasterPmsPlansRepository pmsPlansRepository;
     private final MasterPmsBanksRepository pmsBanksRepository;
+    private final MasterAccountsRepository masterAccountsRepository;
 
     @GetMapping("/master/countries")
     @Operation(summary = "Get countries")
@@ -88,7 +89,11 @@ public class ClientContentController {
     }
 
     @GetMapping("/master/pms-managers")
-    @Operation(summary = "Get PMS portfolio managers")
+    @Operation(summary = "Get PMS portfolio managers",
+            description = "Returns the portfolio manager list with the firm display name resolved "
+                    + "from master_accounts.name via the _ss_nameofthefirm_value → accountid join. "
+                    + "The raw ss_name column is often a SEBI registration code or NULL, so the UI "
+                    + "should prefer firmName when present.")
     public ResponseEntity<List<MasterPortfolioManagersDto>> getPmsManagers() {
         return ResponseEntity.ok(pmsManagersRepository.findAll().stream()
                 .map(m -> MasterPortfolioManagersDto.builder()
@@ -97,12 +102,15 @@ public class ClientContentController {
                         .ssPortfolioManagerId(m.getSsPortfolioManagerId())
                         .ssServiceProviderType(m.getSsServiceProviderType())
                         .ssNameOfTheFirmValue(m.getSsNameOfTheFirmValue())
+                        .firmName(resolveAccountName(m.getSsNameOfTheFirmValue()))
                         .build())
                 .collect(Collectors.toList()));
     }
 
     @GetMapping("/master/pms-plans")
-    @Operation(summary = "Get PMS plans")
+    @Operation(summary = "Get PMS plans",
+            description = "Returns plans with the resolved preferred bank display name "
+                    + "(master_accounts.name via _ss_preferredbank_value).")
     public ResponseEntity<List<MasterPmsPlansDto>> getPmsPlans() {
         return ResponseEntity.ok(pmsPlansRepository.findAll().stream()
                 .map(p -> MasterPmsPlansDto.builder()
@@ -116,12 +124,17 @@ public class ClientContentController {
                         .ssPmsValue(p.getSsPmsValue())
                         .ssPreferredBankValue(p.getSsPreferredBankValue())
                         .ssSchemeValue(p.getSsSchemeValue())
+                        .preferredBankName(resolveAccountName(p.getSsPreferredBankValue()))
                         .build())
                 .collect(Collectors.toList()));
     }
 
     @GetMapping("/master/pms-banks")
-    @Operation(summary = "Get PMS banks")
+    @Operation(summary = "Get PMS banks",
+            description = "Returns the configured PMS bank list with bankName resolved from "
+                    + "master_accounts.name via ss_bank_value. Note: master_pms_banks may be empty "
+                    + "in environments where Dataverse sync has not yet populated it — the React "
+                    + "wizard falls back to the plan's preferredBankName in that case.")
     public ResponseEntity<List<MasterPmsBanksDto>> getPmsBanks() {
         return ResponseEntity.ok(pmsBanksRepository.findAll().stream()
                 .map(b -> MasterPmsBanksDto.builder()
@@ -130,8 +143,23 @@ public class ClientContentController {
                         .ssPmsBankId(b.getSsPmsBankId())
                         .ssPortfolioManagerValue(b.getSsPortfolioManagerValue())
                         .ssBankValue(b.getSsBankValue())
+                        .bankName(resolveAccountName(b.getSsBankValue()))
                         .build())
                 .collect(Collectors.toList()));
+    }
+
+    /**
+     * Look up the human-readable display name for a Dataverse account GUID.
+     * Returns {@code null} when the GUID is blank or no row matches —
+     * callers should fall back to whatever raw label they have.
+     */
+    private String resolveAccountName(String accountId) {
+        if (accountId == null || accountId.isBlank()) {
+            return null;
+        }
+        return masterAccountsRepository.findByAccountId(accountId)
+                .map(a -> a.getName())
+                .orElse(null);
     }
 
     @GetMapping("/master/isd-codes")
