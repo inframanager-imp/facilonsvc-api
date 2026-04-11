@@ -752,6 +752,13 @@ public class ClientProfileService {
         status.setUserOciCardNo(dto.getUserOciCardNo());
         status.setUserOciIssueDate(dto.getUserOciIssueDate());
         status.setUserOciValidUpto(dto.getUserOciValidUpto());
+        status.setPersonOrigin(dto.getPersonOrigin());
+        status.setProofOfAddress(dto.getProofOfAddress());
+        status.setAadharNumberOption(dto.getAadharNumberOption());
+        status.setAadharNumber(dto.getAadharNumber());
+        status.setUserAadharNo(dto.getUserAadharNo());
+        status.setOciAvailable(dto.getOciAvailable());
+        status.setDateOfOci(dto.getDateOfOci() != null && !dto.getDateOfOci().isBlank() ? java.time.LocalDate.parse(dto.getDateOfOci()) : null);
         status.setTenant(tenant);
         status = residentialStatusRepository.save(status);
 
@@ -800,6 +807,9 @@ public class ClientProfileService {
         taxInfo.setTaxPanFatherName(dto.getTaxPanFatherName());
         taxInfo.setTaxResidencyCertificateNo(dto.getTaxResidencyCertificateNo());
         taxInfo.setTaxResidencyCertificateDate(dto.getTaxResidencyCertificateDate());
+        taxInfo.setTaxInfo(dto.getTaxInfo());
+        taxInfo.setTaxPanNo(dto.getTaxPanNo());
+        taxInfo.setUsPersonFatca(dto.getUsPersonFatca());
         taxInfo.setIsTaxExempt("exempt".equalsIgnoreCase(dto.getTaxResidencyStatus()));
         taxInfo.setTenant(tenant);
         taxInfo = taxInformationRepository.save(taxInfo);
@@ -1188,6 +1198,13 @@ public class ClientProfileService {
                 .userOciCardNo(s.getUserOciCardNo())
                 .userOciIssueDate(s.getUserOciIssueDate())
                 .userOciValidUpto(s.getUserOciValidUpto())
+                .personOrigin(s.getPersonOrigin())
+                .proofOfAddress(s.getProofOfAddress())
+                .aadharNumberOption(s.getAadharNumberOption())
+                .aadharNumber(s.getAadharNumber())
+                .userAadharNo(s.getUserAadharNo())
+                .ociAvailable(s.getOciAvailable())
+                .dateOfOci(s.getDateOfOci() != null ? s.getDateOfOci().toString() : null)
                 .build();
     }
 
@@ -1211,6 +1228,9 @@ public class ClientProfileService {
                 .taxPanFatherName(t.getTaxPanFatherName())
                 .taxResidencyCertificateNo(t.getTaxResidencyCertificateNo())
                 .taxResidencyCertificateDate(t.getTaxResidencyCertificateDate())
+                .taxInfo(t.getTaxInfo())
+                .taxPanNo(t.getTaxPanNo())
+                .usPersonFatca(t.getUsPersonFatca())
                 .build();
     }
 

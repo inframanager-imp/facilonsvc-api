@@ -86,6 +86,16 @@ public class InvestorTaxInformation extends TenantEntity {
     @Column(name = "tax_residency_certificate_date")
     private String taxResidencyCertificateDate;
 
+    // Laravel parity fields
+    @Column(name = "tax_info", columnDefinition = "TEXT")
+    private String taxInfo;
+
+    @Column(name = "tax_pan_no", columnDefinition = "TEXT")
+    private String taxPanNo;
+
+    @Column(name = "us_person_fatca", columnDefinition = "TEXT")
+    private String usPersonFatca;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

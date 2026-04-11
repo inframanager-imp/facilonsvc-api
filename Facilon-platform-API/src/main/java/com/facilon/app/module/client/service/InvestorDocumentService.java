@@ -740,7 +740,34 @@ public class InvestorDocumentService {
                     })
                     .findFirst()
                     .orElse(null);
-            
+
+            // Real-time status enrichment: sync Dataverse status → local DB
+            // Mirrors Laravel CheckInvestorDocumentStatus command
+            Integer dvStatusCode = (Integer) dynDoc.get("ss_documentstatus");
+            if (uploaded != null && dvStatusCode != null) {
+                String dvStatus = DynamicsCrmService.DOCUMENT_STATUS_MAP.get(dvStatusCode);
+                if (dvStatus != null && !dvStatus.equals(uploaded.getStatus())) {
+                    log.info("[DocStatusSync] Real-time update for doc {}: '{}' -> '{}'",
+                            uploaded.getId(), uploaded.getStatus(), dvStatus);
+                    uploaded.setStatus(dvStatus);
+
+                    // Fetch rejection reason for non-Approved statuses
+                    if (!"Approved".equals(dvStatus) && dynamicsCrmService != null) {
+                        String reason = dynamicsCrmService.fetchDocumentComments(dynamicsId);
+                        if (reason != null) {
+                            uploaded.setReason(reason);
+                        }
+                    }
+
+                    // Soft-delete if not Approved (mirrors Laravel: allows re-upload)
+                    if (!"Approved".equals(dvStatus)) {
+                        uploaded.setDeletedAt(java.time.LocalDateTime.now());
+                    }
+
+                    kycDocumentsRepository.save(uploaded);
+                }
+            }
+
             KycDocumentRequirementDto.RequiredDocument req = KycDocumentRequirementDto.RequiredDocument.builder()
                     .dynamicsId(dynamicsId)
                     .description(description != null ? description : "Unknown Document")

@@ -100,6 +100,11 @@ dataverse:
     cron: "0 0 2 * * *"
     # Set to false to disable the scheduled cron (startup sync still runs if run-on-startup=true)
     cron-enabled: true
+  document-status-sync:
+    # Cron expression — default: every 15 minutes
+    cron: "0 */15 * * * *"
+    # Set to false to disable the scheduled document status sync
+    cron-enabled: true
   sharepoint:
     parent-location-id: "112fd6a2-12f1-f011-8406-7ced8d285638"
     site-collection-id: "43de59de-265e-f011-877b-7c1e5232a375"

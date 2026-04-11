@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -95,6 +96,28 @@ public class InvestorResidentialStatus extends TenantEntity {
 
     @Column(name = "user_visa_valid_upto")
     private String userVisaValidUpto;
+
+    // Laravel parity fields
+    @Column(name = "person_origin", columnDefinition = "TEXT")
+    private String personOrigin;
+
+    @Column(name = "proof_of_address", columnDefinition = "TEXT")
+    private String proofOfAddress;
+
+    @Column(name = "aadhar_number_option", columnDefinition = "TEXT")
+    private String aadharNumberOption;
+
+    @Column(name = "aadhar_number", columnDefinition = "TEXT")
+    private String aadharNumber;
+
+    @Column(name = "user_aadhar_no", columnDefinition = "TEXT")
+    private String userAadharNo;
+
+    @Column(name = "oci_available", columnDefinition = "TEXT")
+    private String ociAvailable;
+
+    @Column(name = "date_of_oci")
+    private LocalDate dateOfOci;
 
     @Column(name = "is_politically_exposed")
     @Builder.Default

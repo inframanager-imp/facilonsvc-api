@@ -37,7 +37,15 @@ import java.util.Set;
 public class DynamicsCrmService {
 
     private static final Logger log = LoggerFactory.getLogger(DynamicsCrmService.class);
-    
+
+    /** Dataverse ss_documentstatus code → display string (mirrors Laravel CheckInvestorDocumentStatus). */
+    public static final Map<Integer, String> DOCUMENT_STATUS_MAP = Map.of(
+            100000000, "Submitted",
+            100000001, "Approved",
+            100000002, "Rejected",
+            100000003, "Sent Back"
+    );
+
     private final RestTemplate restTemplate;
     private final MasterNationalityRepository nationalityRepository;
     private final MasterCountryOfResidenceRepository countryOfResidenceRepository;
@@ -517,6 +525,7 @@ public class DynamicsCrmService {
                     String description = doc.path("ss_description").asText(); // Readable name!
                     String recordName = doc.path("ss_name").asText(); // Autonumber
                     boolean verificationDone = doc.path("ss_verification_done").asBoolean(false);
+                    int documentStatus = doc.path("ss_documentstatus").asInt(-1);
                     int documentCategory = doc.path("ss_documentcategory").asInt(-1);
 
                     // Match Laravel document_submission_show behavior:
@@ -546,6 +555,9 @@ public class DynamicsCrmService {
                     docMap.put("ss_documentmasterid", documentMasterId);
                     docMap.put("ss_name", displayName); // Use ss_description or fallback to ss_name
                     docMap.put("ss_verification_done", verificationDone);
+                    if (documentStatus != -1) {
+                        docMap.put("ss_documentstatus", documentStatus);
+                    }
                     documents.add(docMap);
                     
                     log.info("  📄 Document: '{}' (id: {}, record: {}, masterid: {})", 
@@ -639,7 +651,8 @@ public class DynamicsCrmService {
                     String documentMasterId = node.has("_ss_documentmaster_value") ? node.get("_ss_documentmaster_value").asText() : "";
                     Integer documentType = node.has("ss_documenttype") ? node.get("ss_documenttype").asInt() : null;
                     int documentCategory = node.path("ss_documentcategory").asInt(-1);
-                    
+                    int documentStatus = node.path("ss_documentstatus").asInt(-1);
+
                     String displayName = (description != null && !description.trim().isEmpty()) ? description : recordName;
 
                     // Match Laravel behavior:
@@ -668,16 +681,19 @@ public class DynamicsCrmService {
                     docMap.put("ss_name", recordName);
                     docMap.put("ss_description", displayName);
                     docMap.put("_ss_documentmaster_value", documentMasterId);
-                    
+
                     if (documentType != null) {
                         docMap.put("ss_documenttype", documentType);
                     }
-                    
+                    if (documentStatus != -1) {
+                        docMap.put("ss_documentstatus", documentStatus);
+                    }
+
                     // Add document master URL for download link (Laravel: $data12['value'][$key]['ss_doc_master_url'])
                     if (documentMasterUrl != null) {
                         docMap.put("ss_doc_master_url", documentMasterUrl);
                     }
-                    
+
                     documents.add(docMap);
                     
                     log.info("  📄 Onboarding Document: '{}' (id: {}, type: {}, masterid: {}, masterUrl: {})", 
@@ -1046,6 +1062,55 @@ public class DynamicsCrmService {
             log.error("❌ Failed to update Dataverse document record: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to update Dataverse document URL: " + e.getMessage());
         }
+    }
+
+    /**
+     * Fetch the latest rejection/review comment for a Dataverse investor document.
+     * Mirrors Laravel CheckInvestorDocumentStatus:
+     * <pre>
+     *   GET ss_comments?$filter=_regardingobjectid_value eq {dynamicsId}
+     *       &$select=description,ss_documentstatus,createdon
+     *       &$orderby=createdon desc&$top=5
+     * </pre>
+     *
+     * @param dynamicsId the ss_investordocumentsid from Dataverse
+     * @return the latest comment description, or null if none found
+     */
+    public String fetchDocumentComments(String dynamicsId) {
+        if (tokenProvider == null || dynamicsId == null || dynamicsId.isBlank()) {
+            return null;
+        }
+
+        String accessToken = tokenProvider.getDynamicsToken();
+        String baseUrl = tokenProvider.getDynamicsBaseUrl();
+        if (accessToken == null || baseUrl == null) {
+            return null;
+        }
+
+        String url = baseUrl + "/ss_comments?$filter=_regardingobjectid_value eq " + dynamicsId
+                + "&$select=description,ss_documentstatus,createdon"
+                + "&$orderby=createdon desc&$top=5";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.set("OData-MaxVersion", "4.0");
+        headers.set("OData-Version", "4.0");
+
+        try {
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+            JsonNode body = response.getBody();
+            if (body != null && body.has("value") && body.get("value").isArray() && body.get("value").size() > 0) {
+                String description = body.get("value").get(0).path("description").asText(null);
+                log.debug("[DocStatusSync] Fetched comment for doc {}: {}", dynamicsId,
+                        description != null ? description.substring(0, Math.min(description.length(), 80)) : "null");
+                return description;
+            }
+        } catch (Exception e) {
+            log.warn("[DocStatusSync] Failed to fetch comments for document {}: {}", dynamicsId, e.getMessage());
+        }
+        return null;
     }
 
     /**

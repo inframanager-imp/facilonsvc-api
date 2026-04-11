@@ -36,4 +36,11 @@ public interface KycDocumentsRepository extends JpaRepository<KycDocuments, Long
     Optional<KycDocuments> findInvestorInformationRecord(@Param("investorUniqueId") String investorUniqueId,
                                                          @Param("documentType") String documentType,
                                                          @Param("documentMasterId") String documentMasterId);
+
+    /** Distinct investor unique IDs that have non-deleted kyc_documents (for background status sync). */
+    @Query("SELECT DISTINCT k.investorUniqueId FROM KycDocuments k WHERE k.deletedAt IS NULL AND k.investorUniqueId IS NOT NULL")
+    List<String> findDistinctInvestorUniqueIdsWithNonDeletedDocs();
+
+    /** Find by Dataverse document-master ID (non-deleted). Used for status sync. */
+    Optional<KycDocuments> findByDocumentMasterIdAndDeletedAtIsNull(String documentMasterId);
 }
