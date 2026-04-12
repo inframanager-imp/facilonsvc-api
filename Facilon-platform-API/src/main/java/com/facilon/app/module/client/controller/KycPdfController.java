@@ -4,7 +4,6 @@ import com.facilon.app.module.client.dto.InvestorDto;
 import com.facilon.app.module.client.dto.KycFormDataDto;
 import com.facilon.app.module.client.service.ClientService;
 import com.facilon.app.module.client.service.KycPdfService;
-import com.facilon.app.module.client.service.KycPdfStampService;
 import com.facilon.app.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,13 +31,12 @@ import org.springframework.web.bind.annotation.*;
 public class KycPdfController {
 
     private final KycPdfService kycPdfService;
-    private final KycPdfStampService kycPdfStampService;
     private final ClientService clientService;
 
     /**
      * Download the filled KYC PDF for the authenticated investor.
-     * Uses FreeMarker template (kyc-form-master.ftl) converted from Laravel pdf.blade
-     * rendered to PDF via Flying Saucer — full parity with Laravel DomPDF output.
+     * Uses FreeMarker template (kyc-form-master.ftl) rendered to PDF via
+     * Headless Chromium (Playwright) — full HTML5 / modern CSS support.
      */
     @GetMapping("/kyc-form")
     @Operation(summary = "Download KYC form PDF for current user")

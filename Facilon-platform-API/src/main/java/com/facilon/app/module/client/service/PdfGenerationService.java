@@ -1297,48 +1297,4 @@ public class PdfGenerationService {
                 }
         }
 
-        /**
-         * Generate comprehensive Account Opening Kit PDF (equivalent to Laravel pdf.blade.php)
-         * This is the full PDF with all regulatory documents - ~200+ pages
-         */
-        public byte[] generateAccountOpeningKitPdf(Long investorId) {
-                try {
-                        String html = generateAccountOpeningKitHtml(investorId);
-                        return convertHtmlToPdf(html);
-                } catch (Exception e) {
-                        log.error("Error generating Account Opening Kit PDF: {}", e.getMessage(), e);
-                        throw new RuntimeException("Failed to generate Account Opening Kit PDF", e);
-                }
-        }
-
-        /**
-         * Generate Account Opening Kit PDF by user ID
-         */
-        public byte[] generateAccountOpeningKitPdfByUserId(Long userId) {
-                Investor investor = investorRepository.findByAuthorizedUser_Id(userId)
-                                .orElseThrow(() -> new RuntimeException("Investor not found for user: " + userId));
-                return generateAccountOpeningKitPdf(investor.getId());
-        }
-
-        /**
-         * Generate Account Opening Kit HTML (for preview)
-         */
-        public String generateAccountOpeningKitHtml(Long investorId) {
-                try {
-                        Map<String, Object> templateData = prepareTemplateData(investorId);
-                        return processTemplate("pdf/account-opening-kit.ftl", templateData);
-                } catch (Exception e) {
-                        log.error("Error generating Account Opening Kit HTML: {}", e.getMessage(), e);
-                        throw new RuntimeException("Failed to generate Account Opening Kit HTML", e);
-                }
-        }
-
-        /**
-         * Generate Account Opening Kit HTML by user ID
-         */
-        public String generateAccountOpeningKitHtmlByUserId(Long userId) {
-                Investor investor = investorRepository.findByAuthorizedUser_Id(userId)
-                                .orElseThrow(() -> new RuntimeException("Investor not found for user: " + userId));
-                return generateAccountOpeningKitHtml(investor.getId());
-        }
 }

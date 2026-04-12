@@ -25,14 +25,9 @@ import java.util.*;
  * Collects investor data from 9+ repositories, resolves master-data lookups
  * (nationality, country, state, title), and builds a flat {@link KycFormDataDto}.
  *
- * Two rendering approaches available:
- * <ul>
- *   <li><b>AcroForm stamping</b> — {@link KycPdfStampService#stampPdf} fills the static
- *       {@code pdf/kyc-form-fillable.pdf}. Used by the frontend download.</li>
- *   <li><b>FreeMarker HTML→PDF</b> — {@link #generateKycPdf} renders
- *       {@code templates/pdf/kyc-form/kyc-form-master.ftl} via Flying Saucer.
- *       Converted from Laravel {@code pdf.blade}.</li>
- * </ul>
+ * Rendering: {@link #generateKycPdf} renders
+ * {@code templates/pdf/kyc-form/kyc-form-master.ftl} via Headless Chromium
+ * (Playwright), converted from the Laravel {@code pdf.blade}.
  */
 @Service
 @RequiredArgsConstructor
@@ -393,7 +388,7 @@ public class KycPdfService {
         return renderTemplate(dto);
     }
 
-    /** Render the KYC form as a PDF byte array via FreeMarker + Flying Saucer. */
+    /** Render the KYC form as a PDF byte array via FreeMarker + Headless Chromium (Playwright). */
     public byte[] generateKycPdf(String uniqueCode) {
         String html = generateKycPreviewHtml(uniqueCode);
         return convertHtmlToPdf(html);
