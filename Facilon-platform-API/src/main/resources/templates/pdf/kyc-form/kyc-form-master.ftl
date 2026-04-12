@@ -24,7 +24,6 @@
         /* Style for paragraph element */
         p {
             text-align: justify;
-            font-weight: 700;
         }
 
         /* Style for anchor tag */
@@ -37,8 +36,7 @@
         .WordSection1 {
             margin: 0;
             padding: 0;
-            height: 100%;
-            overflow: hidden;
+            page-break-after: always;
         }
         .main-table-row tr{
             border:none;
@@ -51,89 +49,73 @@
             border:none;
         }
 
-        .header,
-        .footer {
+        .WordSection1 .header {
             width: 100%;
-            position: fixed;
             background-color: #f58220;
             color: #fff;
             text-align: center;
-            padding: 10px;
-        }
-
-        .header {
-            height: 200px;
-        }
-
-        .footer {
-            font-size: 15px;
+            height: 180px;
+            margin: 0 -20px;
+            padding: 0 20px;
+            box-sizing: content-box;
         }
 
         .logo {
-            margin-top: 180px;
             text-align: center;
+            margin-top: 120px;
+            margin-bottom: 180px;
         }
 
         .logo img {
-            max-width: 100%;
+            max-width: 300px;
             height: auto;
-            width: auto;
-            margin-top: 190px;
-             margin-bottom: 170px;
         }
 
         .form-section {
             width: 80%;
             border: 2px solid #000;
             padding: 20px;
-            margin: 20px auto;
+            margin: 20px auto 180px auto;
             box-sizing: border-box;
-            max-height: calc(100% - 220px);
-            /* Prevents overflow */
-            overflow: hidden;
         }
 
         .form-section p {
             margin: 10px 0;
             font-size: 16px;
+            font-weight: bold;
         }
 
-        .footer {
-            margin-top: 60px;
+        .WordSection1 .footer {
             width: 100%;
             background-color: #f58220;
             text-align: center;
-            padding: 10px 0;
+            padding: 25px 0;
             color: #fff;
-            font-size: 18px;
+            font-size: 32px;
             font-weight: bold;
-            position: absolute;
+            margin: 0 -20px;
         }
 
-        .footer span {
+        .WordSection1 .footer span {
             display: block;
-            font-size: 14px;
+            font-size: 18px;
             margin-top: 5px;
-            font-weight: normal;
+            font-weight: bold;
         }
 
         .WordSection2 {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
+            page-break-after: always;
         }
 
         table {
-            /*border: 1px solid #f2f2f2;*/
             border: none;
             border-collapse: collapse;
             width: 100%;
         }
         th, td {
-            /*border: 1px solid #000000;*/
             border: none;
             padding: 8px;
             text-align: left;
@@ -152,7 +134,7 @@
             font-size: 13px;
         }
 
-        th {
+        .WordSection2 th {
             background-color: #f2f2f2;
         }
 
@@ -168,6 +150,7 @@
             margin-top: 5px;
             margin-left: 65px;
             text-align: justify;
+            font-weight: bold;
         }
 
         .list-paragraph b {
@@ -208,36 +191,22 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
         }
 
-        .instructions-header {
+        .WordSection3 .instructions-header {
             font-weight: bold;
-        }
-
-        .list-paragraph {
-            font-size: 16px;
-            margin: 10px 0;
         }
 
         .WordSection4 {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
         }
 
         .WordSection5 {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
         }
         .square-box {
             display: inline-block;
@@ -247,9 +216,9 @@
             /*margin: 2px;*/
         }
 
-        td div {
+        td div.d-flex {
             display: flex;
-            gap: 5px; /* Optional spacing between boxes */
+            gap: 5px;
             align-items: center;
         }
         .small-square-box {
@@ -270,6 +239,12 @@
 
         .page-break {
             page-break-after: always;
+            break-after: page;
+            clear: both;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: none;
         }
 
         .list-font {
@@ -308,7 +283,9 @@
 
       table.pdf-bordered td, table.pdf-bordered th {
         border: 1px solid #000;
-        padding: 6px;
+        padding: 4px;
+        text-align: left;
+        vertical-align: top;
       }
 
       p.list-paragraph {
@@ -319,17 +296,6 @@
         text-align: justify;
         font-size: 11px;
         font-weight: normal;
-      }
-
-      table, th, td {
-        border: 1px solid #000;
-        border-collapse: collapse;
-        font-size: 11px;
-      }
-      th, td {
-        padding: 2px;
-        text-align: left;
-        vertical-align: top;
       }
 
         .PART-II-TRADING{
@@ -433,6 +399,22 @@
         margin-bottom: 5px;
         margin-top: 5px;
     }
+
+    .WordSectionneww100 {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+    }
+
+    /* Chromium print: prevent content overflow across pages */
+    @media print {
+        .page-break {
+            page-break-after: always;
+            break-after: page;
+        }
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; }
+    }
     </style>
 </head>
 
@@ -440,7 +422,7 @@
     <!-- First Page with Design -->
     <div class="WordSection1">
         <!-- Header Section -->
-        <div class="header" style="margin-top: 20px;"></div>
+        <div class="header"></div>
 
         <!-- Logo -->
         <div class="logo">
@@ -815,6 +797,8 @@
         </p>
 
     </div>
+
+    <div class="page-break"></div>
 
     <!-- Third Page with Content -->
     <div class="WordSection3">
@@ -1724,7 +1708,7 @@ Account Type <span style="color:red;">*</span>
 
                 </tr>
             </table>
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;"> -------- 01 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;"> -------- 01 -------- </span>
         <!-- Page Break -->
         <div class="page-break"></div>
         </div>
@@ -2296,7 +2280,7 @@ Account Type <span style="color:red;">*</span>
 
 
     </div>
-    <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 02 -------- </span>
+    <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 02 -------- </span>
         <!-- Page Break -->
         <div class="page-break"></div>
 
@@ -2851,13 +2835,13 @@ Account Type <span style="color:red;">*</span>
         </table>
     </div>
 
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 03 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 03 -------- </span>
 
 
 
 
 <!--======================Second Holder====================================-->
-    <span style="position:absolute; bottom:0; left:40%;display: none;"> -------- 06 -------- </span>
+    <span style="text-align:center;display: none;"> -------- 06 -------- </span>
     <div class="page-break"></div>
 
 <#-- KYC Form Part 2 - Converted from Laravel Blade (lines 3285-5789) to FreeMarker -->
@@ -3184,7 +3168,7 @@ Account Type <span style="color:red;">*</span>
             </tbody>
         </table>
 
-        <span style="position:absolute; bottom:0; left:40%;"> -------- 07 -------- </span>
+        <span style="text-align:center;"> -------- 07 -------- </span>
 <div class="page-break"></div>
 
 <#-- ============================================================ -->
@@ -3584,7 +3568,7 @@ Account Type <span style="color:red;">*</span>
             <li>Mention identification / reference number if 'Z- Others (any document notified by the central government)' is ticked.</li>
         </ol>
 
-        <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 04 -------- </span>
+        <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 04 -------- </span>
 
         <div class="page-break"></div>
 <br />
@@ -3909,7 +3893,7 @@ Account Type <span style="color:red;">*</span>
                 <td style="text-align: left;font-size: 10px; width: 15%; text-align: left; border:none;">South Georgia and the South Sandwich Islands</td>
                 <td style="text-align: left;font-size: 10px; width: 10%; text-align: center; border:none;">GS</td>
             </tr>
-        <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 05 -------- </span>
+        <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 05 -------- </span>
             <tr style="background: #dcddde;">
                 <td style="text-align: left;font-size: 10px; width: 15%; text-align: left; border:none;">Bangladesh</td>
                 <td style="text-align: left;font-size: 10px; width: 10%; text-align: center; border:none;">BD</td>
@@ -4001,7 +3985,7 @@ Account Type <span style="color:red;">*</span>
                 <td style="text-align: left;font-size: 10px; width: 10%; text-align: center; border:none;">CH</td>
             </tr>
 
-        <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 06 -------- </span>
+        <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 06 -------- </span>
             <tr>
                 <td style="text-align: left;font-size: 10px; width: 15%; text-align: left; border:none;">Bonaire, Sint Eustatius and Saba</td>
                 <td style="text-align: left;font-size: 10px; width: 10%; text-align: center; border:none;">BQ</td>
@@ -4373,7 +4357,7 @@ Account Type <span style="color:red;">*</span>
         </table>
     </div>
 </div>
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 07 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 07 -------- </span>
 
 <#-- ============================================================ -->
 <#-- PART II - TRADING ACCOUNT RELATED DETAILS -->
@@ -4873,7 +4857,7 @@ Occupation <span style="font-weight:normal;">(please tick any one and give brief
             </td>
         </tr>
     </table>
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 08 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 08 -------- </span>
       <div class="page-break"></div>
   <br />
 
@@ -5196,7 +5180,7 @@ Occupation <span style="font-weight:normal;">(please tick any one and give brief
 
 </div>
 
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 09 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 09 -------- </span>
 
 <#-- KYC Form Part 3 - Converted from Laravel Blade (lines 5790-8934) to FreeMarker -->
 <#-- FORM-9 Demat Account Opening, Nominations, DP Charges, DDPI, FATCA, MITC, etc. -->
@@ -5652,7 +5636,7 @@ ${(data.rbiApprovalNumber!'')?upper_case}
 </td>
 </tr></table>
 
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 10 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 10 -------- </span>
  <div class="page-break"> </div>
 <br />
 <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 3px; border: 1px solid black;">
@@ -5783,7 +5767,7 @@ ${(data.rbiApprovalNumber!'')?upper_case}
                 </tr>
             </table>
 
-	 <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 11 -------- </span>
+	 <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 11 -------- </span>
 <br />
         <div class="page-break"> </div>
 
@@ -5982,7 +5966,7 @@ account, I/we also declare that I/we have complied and will continue to comply w
     </tr>
 </table>
 <br />
-	 <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 12 -------- </span>
+	 <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 12 -------- </span>
       <div class="page-break"> </div>
 <br />
     <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top:5px; border:none;">
@@ -6141,7 +6125,7 @@ account, I/we also declare that I/we have complied and will continue to comply w
     </table>
 
 
-	 <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 13 -------- </span>
+	 <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 13 -------- </span>
 
         <div class="page-break"> </div>
 
@@ -6496,7 +6480,7 @@ account, I/we also declare that I/we have complied and will continue to comply w
          <td colspan="2" style="border: 1px solid black; padding: 5px; font-size: 11px; "> </td>
     </tr>
 </table>
-	 <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 14 -------- </span>
+	 <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 14 -------- </span>
 <table>
      <tr style="border: 1px solid black;">
         <td colspan="4" style=" padding: 5px; font-size: 11px;  text-align:justify; ">
@@ -6543,7 +6527,7 @@ such competent authority, based on the value of assets held in the MF Folio / tr
         </td>
     </tr>
  </table>
-	 <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 15 -------- </span>
+	 <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 15 -------- </span>
 
 
 
@@ -6777,7 +6761,7 @@ higher </td>
 
 
 
-   <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 16 -------- </span>
+   <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 16 -------- </span>
 
         <div class="page-break"> </div>
 
@@ -6928,7 +6912,7 @@ reasonable time on my/ our request at any later date.
 </table>
 
 
-      <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 17 -------- </span>
+      <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 17 -------- </span>
 
         <div class="page-break"> </div>
         <br />
@@ -7048,7 +7032,7 @@ reasonable time on my/ our request at any later date.
 
 </div>
 
-          <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 18 -------- </span>
+          <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 18 -------- </span>
 
         <div class="page-break"> </div>
 
@@ -7156,7 +7140,7 @@ reasonable time on my/ our request at any later date.
 
 
 
-      <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 19 -------- </span>
+      <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 19 -------- </span>
 
 
 
@@ -7226,7 +7210,7 @@ reasonable time on my/ our request at any later date.
 
 </div>
 
-              <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 20 -------- </span>
+              <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 20 -------- </span>
 
 
         <div class="page-break"> </div>
@@ -7366,7 +7350,7 @@ reasonable time on my/ our request at any later date.
             <strong>(iii)</strong> I/We agree to submit a new form within 30 days if any information or certification on this form becomes incorrect.
         </td>
     </tr>
-	   <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 21 -------- </span>
+	   <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 21 -------- </span>
     <tr style="border:none; ">
         <td style="padding: 5px; border:none;" colspan="2">
             <strong>(iv)</strong> I/We agree that as may be required by domestic regulators/tax authorities the Ventura may be required to report, reportable details to CBDT or close or suspend my account.
@@ -7421,7 +7405,7 @@ reasonable time on my/ our request at any later date.
     </tr>
 </table>
 
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 22 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 22 -------- </span>
 
 
 
@@ -7486,7 +7470,7 @@ reasonable time on my/ our request at any later date.
         </tr>
     </tbody>
 </table>
-	  <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 23 -------- </span>
+	  <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 23 -------- </span>
 
 
         <div class="page-break"> </div>
@@ -7545,7 +7529,7 @@ reasonable time on my/ our request at any later date.
     </ol>
 
     <br />
-  <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 24 -------- </span>
+  <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 24 -------- </span>
 
     <table style="border:none;">
       <thead>
@@ -7601,7 +7585,7 @@ reasonable time on my/ our request at any later date.
 
 </div>
 
-  <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 25 -------- </span>
+  <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 25 -------- </span>
 
 
         <div class="page-break"> </div>
@@ -7621,7 +7605,7 @@ reasonable time on my/ our request at any later date.
     </div>
     <div style="background-color: #f26b2b; height: 150px;"> </div>
   </div>
-<span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 26 -------- </span>
+<span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 26 -------- </span>
 
         <div class="page-break"> </div>
 
@@ -7705,7 +7689,7 @@ reasonable time on my/ our request at any later date.
   </div>
 
 
-      <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 27 -------- </span>
+      <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 27 -------- </span>
 
         <div class="page-break"> </div>
 
@@ -7779,7 +7763,7 @@ reasonable time on my/ our request at any later date.
         Fresh order placement will be reactivated <strong>@9:15 AM on ex-date</strong>
       </li>
     </ol>
-   <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 28 -------- </span>
+   <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 28 -------- </span>
     <p style="font-weight: normal;">
       <strong>For Example</strong>: If Stock "x" declared bonus and ex-date is 18th August 2024. Those customers having For365 pending orders in that stock would receive a communication about order cancellation @4 PM on 16th August 2024 (including Sundays / Or Holidays). All pending orders would be cancelled @11:30 PM on 17th August 2024 and no fresh orders would be allowed post 11:30 PM. Customers can place fresh For365 orders in that stock or F&amp;O contract from 9:15 AM on 18th August.
     </p>
@@ -7835,7 +7819,7 @@ reasonable time on my/ our request at any later date.
 
   </div>
 
-     <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 29 -------- </span>
+     <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 29 -------- </span>
 
 
       <div class="page-break"> </div>
@@ -7977,8 +7961,29 @@ reasonable time on my/ our request at any later date.
             </table>
     </div>
   </div>
-    <span style="position:absolute; bottom:0; left:40%;margin-bottom: 20px;font-size: 10px;"> -------- 30 -------- </span>
+    <span style="text-align:center;margin-bottom: 20px;font-size: 10px;"> -------- 30 -------- </span>
 
+</div>
+
+<!-- Two blank pages + back cover footer (matches Laravel PDF output) -->
+<div class="page-break"></div>
+<div style="height: 100vh;">&nbsp;</div>
+
+<div class="page-break"></div>
+<div style="height: 100vh;">&nbsp;</div>
+
+<div class="page-break"></div>
+<div style="height: 100vh; position: relative;">
+  <div style="position: absolute; bottom: 0; width: 100%;">
+    <div style="background-color: white; text-align: center; padding: 40px 20px 20px 20px; font-family: Arial, sans-serif; font-size: 13px;">
+      <img src="data:image/jpeg;base64,${data.venturaLogoBase64!''}" alt="Ventura Logo" style="height: 70px; vertical-align: middle;" /><br /><br />
+      I-Think Techno Campus, "B" Wing, 8<sup>th</sup> Floor, Off. Pokhran Road No. 2,<br />
+      Close to Eastern Express Highway, Thane (West) - 400607, Maharashtra, India.<br />
+      <strong>Tel.</strong>: 91-22-6754 7000 / 6622 7100<br />
+      <strong>Website</strong>: <a href="https://www.venturasecurities.com" target="_blank" style="color: black; text-decoration: none;">www.venturasecurities.com</a>
+    </div>
+    <div style="background-color: #f26b2b; height: 150px;">&nbsp;</div>
+  </div>
 </div>
 
 </body>

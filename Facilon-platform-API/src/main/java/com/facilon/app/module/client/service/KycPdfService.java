@@ -443,7 +443,12 @@ public class KycPdfService {
                 byte[] pdf = page.pdf(new Page.PdfOptions()
                         .setFormat("A4")
                         .setPrintBackground(true)
-                        .setPreferCSSPageSize(true));
+                        .setPreferCSSPageSize(false)
+                        .setMargin(new com.microsoft.playwright.options.Margin()
+                                .setTop("10mm")
+                                .setBottom("10mm")
+                                .setLeft("5mm")
+                                .setRight("5mm")));
 
                 log.info("KYC PDF generated via Playwright Chromium: {} bytes", pdf.length);
                 return pdf;
