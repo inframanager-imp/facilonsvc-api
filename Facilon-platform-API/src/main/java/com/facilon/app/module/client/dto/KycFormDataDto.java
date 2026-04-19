@@ -61,6 +61,7 @@ public class KycFormDataDto {
     private String cityOfBirth;
     private String countryOfBirth;
     private String countryOfBirthName;
+    private String countryOfBirthIsoCode;  // 2-letter ISO 3166
     private String proofOfAddress;      // from user_main
     private String addressType;
     private String simplifiedMeasuresAddressCode;
@@ -69,6 +70,7 @@ public class KycFormDataDto {
 
     // ─── Tax Residence (Section tax_residence) ───
     private String taxCountryCode;
+    private String taxCountryIsoCode;  // 2-letter ISO 3166
     private String taxIdNumber;
     private String taxIdType;
 

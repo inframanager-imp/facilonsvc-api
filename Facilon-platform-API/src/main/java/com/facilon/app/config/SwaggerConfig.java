@@ -30,8 +30,8 @@ public class SwaggerConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-        return new OpenAPI().info(new Info().title("logi-NLP").version("1.0").description("logi-NLP")
-                .termsOfService("http://logi").license(new License().name("Apache 2.0").url("http://logi")));
+        return new OpenAPI().info(new Info().title("facilon").version("1.0").description("facilon")
+                .termsOfService("http://facilon").license(new License().name("Apache 2.0").url("http://facilon")));
     }
 
     /**

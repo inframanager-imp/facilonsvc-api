@@ -1,8 +1,10 @@
 package com.facilon.app.module.admin.controller;
 
 import com.facilon.app.integration.dynamics.DataverseMasterSyncService;
+import com.facilon.app.integration.dynamics.PowerAppContactSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +40,7 @@ import java.util.Map;
 public class DataverseMasterSyncController {
 
     private final DataverseMasterSyncService syncService;
+    private final ObjectProvider<PowerAppContactSyncService> powerAppContactSyncServiceProvider;
 
     /**
      * Sync ALL master tables in one call.
@@ -143,6 +146,76 @@ public class DataverseMasterSyncController {
     public ResponseEntity<Map<String, Object>> seedServiceProviderTypes() {
         int count = syncService.seedServiceProviderTypes();
         return ok("master_service_provider_type", count);
+    }
+
+    /** Laravel: /get-gensers-dv → master_gender */
+    @GetMapping("/genders")
+    public ResponseEntity<Map<String, Object>> syncGenders() {
+        int count = syncService.syncGenders();
+        return ok("master_gender", count);
+    }
+
+    /** Laravel: /get-maritials-status-dv → master_maritial_status */
+    @GetMapping("/marital-status")
+    public ResponseEntity<Map<String, Object>> syncMaritalStatus() {
+        int count = syncService.syncMaritalStatus();
+        return ok("master_maritial_status", count);
+    }
+
+    /** Laravel: /get-cities-dv → master_cities */
+    @GetMapping("/cities")
+    public ResponseEntity<Map<String, Object>> syncCities() {
+        int count = syncService.syncCities();
+        return ok("master_cities", count);
+    }
+
+    /** Laravel: /get-title-dv → master_title */
+    @GetMapping("/titles")
+    public ResponseEntity<Map<String, Object>> syncTitles() {
+        int count = syncService.syncTitles();
+        return ok("master_title", count);
+    }
+
+    /** Laravel: /get-type-of-visa → master_type_of_visa */
+    @GetMapping("/visa-types")
+    public ResponseEntity<Map<String, Object>> syncVisaTypes() {
+        int count = syncService.syncVisaTypes();
+        return ok("master_type_of_visa", count);
+    }
+
+    /** Laravel: /get-pms-banks → master_pms_banks */
+    @GetMapping("/pms-banks")
+    public ResponseEntity<Map<String, Object>> syncPmsBanks() {
+        int count = syncService.syncPmsBanks();
+        return ok("master_pms_banks", count);
+    }
+
+    /** Laravel: /country-residenceisd-code-dv → master_country_of_residence */
+    @GetMapping("/country-of-residence")
+    public ResponseEntity<Map<String, Object>> syncCountryOfResidence() {
+        int count = syncService.syncCountryOfResidence();
+        return ok("master_country_of_residence", count);
+    }
+
+    /**
+     * Manual trigger for the PowerApps service-provider contact sync
+     * (Laravel Artisan {@code php artisan powerapp:sync-contacts}).
+     * Normally runs on the scheduler every 10 minutes; this endpoint lets an
+     * admin kick it off on demand for testing or backfill.
+     */
+    @PostMapping("/powerapp-contacts")
+    public ResponseEntity<Map<String, Object>> syncPowerAppContacts() {
+        PowerAppContactSyncService svc = powerAppContactSyncServiceProvider.getIfAvailable();
+        if (svc == null) {
+            return ResponseEntity.status(503).body(Map.of(
+                    "status", "unavailable",
+                    "message", "PowerAppContactSyncService not configured"));
+        }
+        log.info("DataverseMasterSyncController: powerapp contact sync triggered manually");
+        Map<String, Object> summary = svc.sync();
+        return ResponseEntity.ok(Map.of(
+                "message", "PowerApp contact sync completed",
+                "summary", summary));
     }
 
     private ResponseEntity<Map<String, Object>> ok(String table, int count) {

@@ -58,6 +58,13 @@ public class DataverseMasterSyncService {
     private final MasterCountriesRepository masterCountriesRepository;
     private final MasterInvestorTypesRepository masterInvestorTypesRepository;
     private final MasterServiceProviderTypeRepository masterServiceProviderTypeRepository;
+    private final MasterGenderRepository masterGenderRepository;
+    private final MasterMaritalStatusRepository masterMaritalStatusRepository;
+    private final MasterCitiesRepository masterCitiesRepository;
+    private final MasterTitleRepository masterTitleRepository;
+    private final MasterTypeOfVisaRepository masterTypeOfVisaRepository;
+    private final MasterPmsBanksRepository masterPmsBanksRepository;
+    private final MasterCountryOfResidenceRepository masterCountryOfResidenceRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public "sync all critical" entry point  (used by admin /sync-all endpoint)
@@ -81,6 +88,13 @@ public class DataverseMasterSyncService {
         results.put("countries",            runSync("countries",            this::syncCountries));
         results.put("investorTypes",        runSync("investorTypes",        this::syncInvestorTypes));
         results.put("serviceProviderTypes", runSync("serviceProviderTypes", this::seedServiceProviderTypes));
+        results.put("genders",              runSync("genders",              this::syncGenders));
+        results.put("maritalStatus",        runSync("maritalStatus",        this::syncMaritalStatus));
+        results.put("cities",               runSync("cities",               this::syncCities));
+        results.put("titles",               runSync("titles",               this::syncTitles));
+        results.put("visaTypes",            runSync("visaTypes",            this::syncVisaTypes));
+        results.put("pmsBanks",             runSync("pmsBanks",             this::syncPmsBanks));
+        results.put("countryOfResidence",   runSync("countryOfResidence",   this::syncCountryOfResidence));
         return results;
     }
 
@@ -393,6 +407,223 @@ public class DataverseMasterSyncService {
         masterServiceProviderTypeRepository.saveAll(seeds);
         log.info("seedServiceProviderTypes: seeded {} records", seeds.size());
         return seeds.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_gensers_from_dv}
+     * URL: {@code GET /ss_genders}
+     * Table: {@code master_gender}
+     */
+    @Transactional
+    public int syncGenders() {
+        List<JsonNode> rows = fetchAllPages("ss_genders", null);
+        if (rows.isEmpty()) return 0;
+
+        masterGenderRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterGender> entities = rows.stream().map(r -> MasterGender.builder()
+                .id(idx[0]++)
+                .ssName(text(r, "ss_name"))
+                .ssGenderId(text(r, "ss_genderid"))
+                .build()).toList();
+        masterGenderRepository.saveAll(entities);
+        log.info("syncGenders: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_maritials_status_from_dv}
+     * URL: {@code GET /ss_maritalstatuses}
+     * Table: {@code master_maritial_status}
+     */
+    @Transactional
+    public int syncMaritalStatus() {
+        List<JsonNode> rows = fetchAllPages("ss_maritalstatuses", null);
+        if (rows.isEmpty()) return 0;
+
+        masterMaritalStatusRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterMaritalStatus> entities = rows.stream().map(r -> MasterMaritalStatus.builder()
+                .id(idx[0]++)
+                .ssName(text(r, "ss_name"))
+                .ssMaritalStatusId(text(r, "ss_maritalstatusid"))
+                .build()).toList();
+        masterMaritalStatusRepository.saveAll(entities);
+        log.info("syncMaritalStatus: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_cities_from_dv}
+     * URL: {@code GET /ss_cities}
+     * Table: {@code master_cities}
+     */
+    @Transactional
+    public int syncCities() {
+        List<JsonNode> rows = fetchAllPages("ss_cities", null);
+        if (rows.isEmpty()) return 0;
+
+        masterCitiesRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterCities> entities = rows.stream().map(r -> MasterCities.builder()
+                .id(idx[0]++)
+                .ssName(text(r, "ss_name"))
+                .ssCityId(text(r, "ss_cityid"))
+                .importSequenceNumber(text(r, "importsequencenumber"))
+                .ssCity(text(r, "ss_city"))
+                .ssCountryValue(text(r, "_ss_country_value"))
+                .ssStateValue(text(r, "_ss_state_value"))
+                .build()).toList();
+        masterCitiesRepository.saveAll(entities);
+        log.info("syncCities: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_title_from_dv}
+     * URL: {@code GET /ss_titles}
+     * Table: {@code master_title}
+     */
+    @Transactional
+    public int syncTitles() {
+        List<JsonNode> rows = fetchAllPages("ss_titles", null);
+        if (rows.isEmpty()) return 0;
+
+        masterTitleRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterTitle> entities = rows.stream().map(r -> MasterTitle.builder()
+                .id(idx[0]++)
+                .ssName(text(r, "ss_name"))
+                .ssTitleId(text(r, "ss_titleid"))
+                .build()).toList();
+        masterTitleRepository.saveAll(entities);
+        log.info("syncTitles: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_type_of_visa}
+     * URL: {@code GET /ss_visatypes}
+     * Table: {@code master_type_of_visa}
+     *
+     * <p>Laravel capped results with {@code $top=10}; we fetch all pages since the
+     * entity can accommodate more values and the form UI does not rely on that cap.
+     */
+    @Transactional
+    public int syncVisaTypes() {
+        List<JsonNode> rows = fetchAllPages("ss_visatypes", null);
+        if (rows.isEmpty()) return 0;
+
+        masterTypeOfVisaRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterTypeOfVisa> entities = rows.stream().map(r -> MasterTypeOfVisa.builder()
+                .id(idx[0]++)
+                .ssName(text(r, "ss_name"))
+                .statusCode(text(r, "statuscode"))
+                .ssVisaTypeId(text(r, "ss_visatypeid"))
+                .build()).toList();
+        masterTypeOfVisaRepository.saveAll(entities);
+        log.info("syncVisaTypes: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code fetch_pms_banks_from_dv}
+     * URL: {@code GET /ss_prortfoliomanagerbanks}  (Dataverse-side spelling, kept verbatim)
+     * Table: {@code master_pms_banks}
+     */
+    @Transactional
+    public int syncPmsBanks() {
+        List<JsonNode> rows = fetchAllPages("ss_prortfoliomanagerbanks", null);
+        if (rows.isEmpty()) return 0;
+
+        masterPmsBanksRepository.deleteAll();
+        List<MasterPmsBanks> entities = rows.stream().map(r -> MasterPmsBanks.builder()
+                .ssPmsBankId(text(r, "ss_prortfoliomanagerbankid"))
+                .ssName(text(r, "ss_name"))
+                .ssPortfolioManagerValue(text(r, "_ss_portfoliomanager_value"))
+                .ssBankValue(text(r, "_ss_bank_value"))
+                .build()).toList();
+        masterPmsBanksRepository.saveAll(entities);
+        log.info("syncPmsBanks: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Laravel: {@code country_residenceisd_code_dv}
+     * URLs: {@code GET /ss_countryofresidenceisdcodes} AND {@code GET /ss_isdcodes}
+     *       plus local {@code master_countries} lookup for name resolution.
+     * Table: {@code master_country_of_residence}
+     *
+     * <p>Logic mirrors Laravel two-stage merge:
+     * <ol>
+     *   <li>Build ISD-code map keyed by digits extracted from {@code ss_name}.
+     *   <li>Build local country-name map (GUID → name) from {@code master_countries}.
+     *   <li>For each residence-ISD row, look up the matching ISD entry, then the
+     *       country name, and insert the resolved record.
+     * </ol>
+     * Java entity has no {@code isd_number} column, so the phone-number text
+     * is not persisted (present only in Laravel's schema).
+     */
+    @Transactional
+    public int syncCountryOfResidence() {
+        List<JsonNode> residenceRows = fetchAllPages("ss_countryofresidenceisdcodes", null);
+        List<JsonNode> isdRows = fetchAllPages("ss_isdcodes", null);
+        if (residenceRows.isEmpty() || isdRows.isEmpty()) return 0;
+
+        // Step 1: digits(ss_name) → { country GUID, ss_isdcodeid }
+        Map<String, String[]> isdMap = new HashMap<>();
+        for (JsonNode isd : isdRows) {
+            String raw = text(isd, "ss_name");
+            if (raw == null) continue;
+            String code = raw.replaceAll("\\D", "");
+            if (code.isEmpty()) continue;
+            isdMap.put(code, new String[]{
+                    text(isd, "_ss_country_value"),
+                    text(isd, "ss_isdcodeid")
+            });
+        }
+
+        // Step 2: local country GUID → name
+        Map<String, String> countryNameByGuid = new HashMap<>();
+        masterCountriesRepository.findAll().forEach(c -> {
+            if (c.getSsCountryId() != null) {
+                countryNameByGuid.put(c.getSsCountryId(), c.getSsName());
+            }
+        });
+
+        // Step 3: build unique result set keyed by residence-ISD-id
+        Map<String, MasterCountryOfResidence> unique = new LinkedHashMap<>();
+        for (JsonNode row : residenceRows) {
+            String residenceId = text(row, "ss_countryofresidenceisdcodeid");
+            String raw = text(row, "ss_name");
+            if (residenceId == null || raw == null) continue;
+            String code = raw.replaceAll("\\D", "");
+            if (code.isEmpty()) continue;
+
+            String[] isdEntry = isdMap.get(code);
+            if (isdEntry == null) continue;
+            String countryGuid = isdEntry[0];
+            String countryName = countryGuid != null ? countryNameByGuid.get(countryGuid) : null;
+            if (countryName == null) continue;
+
+            unique.put(residenceId, MasterCountryOfResidence.builder()
+                    .ssCountryId(residenceId)
+                    .ssName(countryName)
+                    .ssIsdCode(isdEntry[1])
+                    .build());
+        }
+        if (unique.isEmpty()) return 0;
+
+        // Step 4: insert only rows not already present (preserve existing IDs)
+        List<MasterCountryOfResidence> toInsert = unique.values().stream()
+                .filter(e -> masterCountryOfResidenceRepository.findBySsCountryId(e.getSsCountryId()).isEmpty())
+                .toList();
+
+        masterCountryOfResidenceRepository.saveAll(toInsert);
+        log.info("syncCountryOfResidence: inserted {} new records ({} total resolved)",
+                toInsert.size(), unique.size());
+        return toInsert.size();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

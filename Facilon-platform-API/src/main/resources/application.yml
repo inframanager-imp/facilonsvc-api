@@ -1,3 +1,27 @@
 spring:
   profiles:
     active: dev
+
+# JAVAPDFill service — fills the blank Ventura NRI AcroForm PDF with investor data.
+# Deployed separately (see d:/sam/facilon-git_bub/JAVAPDFill); Facilon calls it over HTTP.
+fillpdf:
+  api:
+    # Base URL of the JAVAPDFill Spring Boot service. Endpoints: POST {base-url}/api/v2/fill
+    base-url: ${FILLPDF_BASE_URL:http://localhost:8086/fillSampdf}
+    # Socket connect timeout — low, the service is typically on the same network
+    connect-timeout-ms: 5000
+    # Response read timeout — PDFBox fill of a 36-page booklet can take several seconds
+    read-timeout-ms: 60000
+    # Retry on network failures (ResourceAccessException). 0 = no retry, 1 = one extra attempt.
+    retry-attempts: 1
+    # strict=true makes JAVAPDFill throw on any validation error (missing required fields etc.).
+    # Keep false during rollout so partial data still produces a PDF.
+    strict: false
+    # verify=true re-reads the filled PDF to confirm every value round-trips. Slower; useful in QA.
+    verify: false
+  kyc:
+    # Engine switch: "fillapi" uses JAVAPDFill + blank PDF; "playwright" renders FTL -> HTML -> PDF (legacy).
+    # Per-request override available via ?engine= query param on the /kyc-form endpoint.
+    engine: ${KYC_PDF_ENGINE:fillapi}
+    # Classpath path to the blank fillable NRI booklet (loaded by KycPdfService.generateKycPdfViaFillApi).
+    nri-template: templates/pdf/kyc-form/nri/Ventura_Account_opening_NRI.pdf

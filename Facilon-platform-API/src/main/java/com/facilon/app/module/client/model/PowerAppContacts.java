@@ -54,6 +54,14 @@ public class PowerAppContacts extends TenantEntity {
     @Column(name = "broker")
     private String broker;
 
+    /**
+     * Service-provider contact type resolved from Dataverse {@code ss_contacttype} option set:
+     * 100000000=Portfolio Manager, 100000001=Broker, 100000002=Custodian, 100000003=Bank.
+     * Matches Laravel {@code SyncNewServiceProviders::$contactTypeMap}.
+     */
+    @Column(name = "contact_type", length = 50)
+    private String contactType;
+
     @Column(name = "invite_redeem_url", columnDefinition = "TEXT")
     private String inviteRedeemUrl;
 

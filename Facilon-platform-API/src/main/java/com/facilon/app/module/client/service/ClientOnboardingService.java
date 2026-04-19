@@ -1,6 +1,7 @@
 package com.facilon.app.module.client.service;
 
 import com.facilon.app.config.TenantContextHolder;
+import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.integration.email.EmailServiceApiClient;
 import com.facilon.app.integration.graphemail.GraphEmailService;
 import com.facilon.app.integration.sms.SmsServiceApiClient;
@@ -64,6 +65,7 @@ public class ClientOnboardingService {
     private final InvestorNotificationService notificationService;
     private final UserGroupRepository userGroupRepository;
     private final TenantB2CConfigService tenantB2CConfigService;
+    private final ObjectProvider<DynamicsCrmService> dynamicsCrmServiceProvider;
 
     @Value("${investor.onboarding.india-country-code:240}")
     private Integer indiaCountryCode;
@@ -383,6 +385,39 @@ public class ClientOnboardingService {
             log.info("Login credentials email sent to {}", user.getEmailId());
         } catch (Exception e) {
             log.warn("Failed to send login credentials email: {}", e.getMessage());
+        }
+
+        // Dataverse write-back (aligned to Laravel InvestorController::investor_register_step4_insert_data L727)
+        // Three-call sequence: POST /contacts → POST /ss_investors (with contact bind) → PATCH /contacts (link back).
+        // Only run when CRM config is available and the investor hasn't already been pushed.
+        DynamicsCrmService crm = dynamicsCrmServiceProvider.getIfAvailable();
+        if (crm != null && investor.getDvContactId() == null) {
+            try {
+                String middleName = personalInfoRepository.findByInvestorUniqueId(investor.getUniqueCode())
+                        .map(UserPersonalInformation::getInvestorMiddleName)
+                        .orElse(null);
+                DynamicsCrmService.InvestorCrmIds ids = crm.registerInvestorInDataverse(
+                        user.getFirstName(),
+                        middleName,
+                        user.getLastName(),
+                        user.getEmailId(),
+                        user.getMobilePhone()
+                );
+                if (ids != null) {
+                    investor.setDvContactId(ids.contactId);
+                    investor.setDvInvestorGuid(ids.investorGuid);
+                    investor.setDvInvestorSsId(ids.investorSsName);
+                    investorRepository.save(investor);
+                    log.info("Dataverse investor record created for {}: contactId={}, investorGuid={}, ss_name={}",
+                            investor.getUniqueCode(), ids.contactId, ids.investorGuid, ids.investorSsName);
+                }
+            } catch (Exception e) {
+                // Laravel calls die() on CRM failure (L724), which aborts the request.  Here we log
+                // and continue so the local user stays activated and can log in — the Dataverse push
+                // can be retried (phase A backfill) without forcing the user to re-register.
+                log.error("Dataverse registration write-back failed for {}: {}",
+                        investor.getUniqueCode(), e.getMessage(), e);
+            }
         }
 
         return VerificationResponseDto.builder()

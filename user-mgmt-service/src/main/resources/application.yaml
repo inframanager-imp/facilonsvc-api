@@ -7,6 +7,8 @@ eureka:
     preferIpAddress: true
 server:
   port: ${SERVICE_1_PORT}
+  servlet:
+    context-path: /usr-mgmt
 spring:
   application:
     name: ${SERVICE_1_NAME}

@@ -1,5 +1,6 @@
 package com.facilon.app.module.client.service;
 
+import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.model.AuthorizedUser;
 import com.facilon.app.module.client.model.*;
 import com.facilon.app.module.client.repository.*;
@@ -38,9 +39,17 @@ public class PdfGenerationService {
         private final InvestorResidentialStatusRepository residentialStatusRepository;
         private final InvestorNominationRepository nominationRepository;
         private final InvestorRiskProfileRepository riskProfileRepository;
-        
+
         @Autowired(required = false)
         private FreeMarkerConfigurer freeMarkerConfigurer;
+
+        // Fresh Dataverse lookups during PDF render (Laravel AdminController::pdf_view L541).
+        // Both are optional so PDF generation still works when Dataverse / intro-temp data
+        // is unavailable (e.g. unit tests, self-registered investors without a broker).
+        @Autowired(required = false)
+        private DynamicsCrmService dynamicsCrmService;
+        @Autowired(required = false)
+        private IntroInvestorTempRepository introInvestorTempRepository;
 
         private static final Font TITLE_FONT = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD, BaseColor.DARK_GRAY);
         private static final Font HEADER_FONT = new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, BaseColor.BLACK);
@@ -1250,6 +1259,12 @@ public class PdfGenerationService {
                 investorMap.put("investorType", investor.getInvestorType());
                 investorMap.put("registerAs", investor.getRegisterAs());
 
+                // Broker section — fresh Dataverse fetch (Laravel AdminController::pdf_view L541).
+                // Resolves the current broker-firm name at PDF-render time so the document
+                // reflects any Dynamics-side edits that have not yet propagated into
+                // master_brokers via the nightly sync.
+                Map<String, Object> brokerMap = resolveBrokerForPdf(uniqueCode);
+
                 // Build template data map
                 Map<String, Object> templateData = new HashMap<>();
                 templateData.put("investor", investorMap);
@@ -1261,8 +1276,52 @@ public class PdfGenerationService {
                 templateData.put("contactDetails", contactDetailsMap);
                 templateData.put("nominations", nominationsList);
                 templateData.put("riskProfile", riskProfileMap);
+                templateData.put("broker", brokerMap);
 
                 return templateData;
+        }
+
+        /**
+         * Resolve the broker's display name for the PDF by calling Dataverse live,
+         * mirroring Laravel's {@code AdminController::pdf_view} (L541) which does a
+         * {@code GET /ss_brokers?$filter=ss_brokerid eq '<guid>'} every time the PDF
+         * is generated — picking up any recent Dynamics-side name changes without
+         * waiting for the nightly master sync.
+         *
+         * <p>Broker GUID is read from the introduced-investor session
+         * ({@code intro_investor_temp.ss_broker_value}).  Self-registered investors
+         * without a broker yield an empty map.
+         *
+         * <p>Both {@link DynamicsCrmService} and {@link IntroInvestorTempRepository}
+         * are optional autowires — missing either simply returns an empty map so
+         * PDF generation continues without broker information.
+         */
+        private Map<String, Object> resolveBrokerForPdf(String uniqueCode) {
+                Map<String, Object> brokerMap = new HashMap<>();
+                if (dynamicsCrmService == null || introInvestorTempRepository == null) {
+                        return brokerMap;
+                }
+                IntroInvestorTemp intro = introInvestorTempRepository
+                                .findByUniqueCodeDb(uniqueCode)
+                                .orElse(null);
+                if (intro == null || intro.getSsBrokerValue() == null
+                                || intro.getSsBrokerValue().isBlank()) {
+                        return brokerMap;
+                }
+
+                String brokerGuid = intro.getSsBrokerValue();
+                brokerMap.put("brokerId", brokerGuid);
+                brokerMap.put("serviceProviderType", intro.getServiceProviderType());
+
+                try {
+                        String name = dynamicsCrmService.fetchBrokerName(brokerGuid);
+                        if (name != null && !name.isBlank()) {
+                                brokerMap.put("name", name);
+                        }
+                } catch (Exception e) {
+                        log.warn("PDF broker-name fetch failed for {}: {}", brokerGuid, e.getMessage());
+                }
+                return brokerMap;
         }
 
         /**

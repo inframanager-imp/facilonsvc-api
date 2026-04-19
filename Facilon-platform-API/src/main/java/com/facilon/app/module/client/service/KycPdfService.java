@@ -4,6 +4,9 @@ import com.facilon.app.module.client.dto.KycFormDataDto;
 import com.facilon.app.module.client.model.*;
 import com.facilon.app.module.client.model.master.*;
 import com.facilon.app.module.client.repository.*;
+import com.facilon.app.module.client.service.pdf.FillPdfClient;
+import com.facilon.app.module.client.service.pdf.FillPdfProperties;
+import com.facilon.app.module.client.service.pdf.KycFormFieldExpander;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.*;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +17,7 @@ import org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer;
 
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,6 +55,9 @@ public class KycPdfService {
     private final MasterStatesRepository masterStatesRepository;
     private final MasterTitleRepository masterTitleRepository;
     private final FreeMarkerConfigurer freeMarkerConfigurer;
+    private final KycFormFieldExpander kycFormFieldExpander;
+    private final FillPdfClient fillPdfClient;
+    private final FillPdfProperties fillPdfProperties;
 
     // ────────────────────────────────────────────────────────────────────
     // Public API
@@ -84,6 +91,7 @@ public class KycPdfService {
 
         String countryOfBirthRaw = safe(pi, p -> p.getCountryDob());
         String countryOfBirthName = resolveCountryName(countryOfBirthRaw);
+        String countryOfBirthIsoCode = resolveCountryIsoCode(countryOfBirthRaw);
 
         String fatherTitleRaw = safe(pi, p -> p.getFatherNameTitle());
         String fatherTitleName = resolveTitleName(fatherTitleRaw);
@@ -113,6 +121,7 @@ public class KycPdfService {
         String fatcaCitizenshipName = citizenshipName;      // same source
         String fatcaTaxResRaw = safe(tx, t -> t.getTaxCountry() != null ? String.valueOf(t.getTaxCountry()) : null);
         String fatcaTaxResidenceName = resolveCountryName(fatcaTaxResRaw);
+        String taxCountryIsoCode = resolveCountryIsoCode(fatcaTaxResRaw);
 
         // Investment experience
         String investmentExp = safe(rp, r -> r.getInvestmentExperienceYears() != null
@@ -172,6 +181,7 @@ public class KycPdfService {
                 .cityOfBirth(safe(pi, p -> p.getCityOfDob()))
                 .countryOfBirth(countryOfBirthRaw)
                 .countryOfBirthName(countryOfBirthName)
+                .countryOfBirthIsoCode(countryOfBirthIsoCode)
                 .proofOfAddress(safe(pi, p -> p.getProofOfAddress()))
                 .addressType(safe(pi, p -> p.getAddressType()))
                 .simplifiedMeasuresAddressCode("")
@@ -179,6 +189,7 @@ public class KycPdfService {
                 .simplifiedMeasuresIdentificationNumber("")
                 // ─── Tax ───
                 .taxCountryCode(safe(tx, t -> t.getTaxCountry() != null ? String.valueOf(t.getTaxCountry()) : null))
+                .taxCountryIsoCode(taxCountryIsoCode)
                 .taxIdNumber(safe(tx, t -> t.getTaxIdentificationNumber()))
                 .taxIdType(safe(tx, t -> t.getTaxIdentificationNumberType()))
                 // ─── ID ───
@@ -390,8 +401,54 @@ public class KycPdfService {
 
     /** Render the KYC form as a PDF byte array via FreeMarker + Headless Chromium (Playwright). */
     public byte[] generateKycPdf(String uniqueCode) {
+        return generateKycPdf(uniqueCode, null);
+    }
+
+    /**
+     * Generate KYC PDF using the requested engine, or the configured default if {@code engine} is null/blank.
+     * Engines:
+     *   - "fillapi"    → fills the blank NRI AcroForm PDF via JAVAPDFill HTTP service
+     *   - "playwright" → renders {@code kyc-form-master.ftl} to HTML → PDF via Chromium (legacy)
+     */
+    public byte[] generateKycPdf(String uniqueCode, String engineOverride) {
+        String engine = (engineOverride != null && !engineOverride.isBlank())
+                ? engineOverride.toLowerCase()
+                : fillPdfProperties.getKyc().getEngine().toLowerCase();
+
+        if ("fillapi".equals(engine)) {
+            log.info("Generating KYC PDF via JAVAPDFill for investor: {}", uniqueCode);
+            return generateKycPdfViaFillApi(uniqueCode);
+        }
+        log.info("Generating KYC PDF via Playwright for investor: {}", uniqueCode);
         String html = generateKycPreviewHtml(uniqueCode);
         return convertHtmlToPdf(html);
+    }
+
+    /**
+     * Fill the blank Ventura NRI AcroForm PDF using the JAVAPDFill service.
+     * Loads the template from classpath, expands the DTO into the ~800-field PDF-keyed map,
+     * and posts both as multipart to {@code /api/v2/fill}.
+     */
+    public byte[] generateKycPdfViaFillApi(String uniqueCode) {
+        KycFormDataDto dto = buildFormData(uniqueCode);
+        Map<String, Object> fields = kycFormFieldExpander.expand(dto);
+
+        String templatePath = fillPdfProperties.getKyc().getNriTemplate();
+        byte[] blankPdf = loadClasspathBytes(templatePath);
+        String filename = Paths.get(templatePath).getFileName().toString();
+
+        return fillPdfClient.fill(blankPdf, filename, fields);
+    }
+
+    private byte[] loadClasspathBytes(String classpathLocation) {
+        try {
+            ClassPathResource resource = new ClassPathResource(classpathLocation);
+            try (InputStream is = resource.getInputStream()) {
+                return is.readAllBytes();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load classpath resource: " + classpathLocation, e);
+        }
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -543,6 +600,27 @@ public class KycPdfService {
         } catch (Exception e) {
             log.warn("Failed to resolve country name for '{}': {}", countryIdStr, e.getMessage());
             return countryIdStr;
+        }
+    }
+
+    /**
+     * Resolve a country id (Dataverse GUID or numeric string) to its ISO 3166 alpha-2 code
+     * (stored in {@code master_countries.ss_country}, e.g. "IN", "US", "GB").
+     * Returns empty string if not found — safer than echoing a raw numeric id into a 2-char widget.
+     */
+    private String resolveCountryIsoCode(String countryIdStr) {
+        if (countryIdStr == null || countryIdStr.isBlank()) return "";
+        try {
+            List<MasterCountries> allCountries = masterCountriesRepository.findAll();
+            return allCountries.stream()
+                    .filter(c -> countryIdStr.trim().equals(c.getSsCountryId())
+                            || countryIdStr.trim().equals(c.getId() != null ? String.valueOf(c.getId()) : ""))
+                    .findFirst()
+                    .map(c -> c.getSsCountry() != null ? c.getSsCountry() : "")
+                    .orElse("");
+        } catch (Exception e) {
+            log.warn("Failed to resolve country ISO code for '{}': {}", countryIdStr, e.getMessage());
+            return "";
         }
     }
 

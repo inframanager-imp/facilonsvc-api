@@ -131,6 +131,10 @@ public class Investor extends TenantEntity {
     @Column(name = "dv_contact_id", length = 36)
     private String dvContactId;
 
+    /** Dataverse ss_investors GUID (ss_investorid). Required for PATCH on ss_investors (bank, intro updates). */
+    @Column(name = "dv_investor_guid", length = 36)
+    private String dvInvestorGuid;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

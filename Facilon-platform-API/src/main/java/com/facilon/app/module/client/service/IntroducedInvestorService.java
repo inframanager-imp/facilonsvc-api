@@ -1,6 +1,7 @@
 package com.facilon.app.module.client.service;
 
 import com.facilon.app.config.TenantContextHolder;
+import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.model.AuthorizedUser;
 import com.facilon.app.model.Tenant;
 import com.facilon.app.module.client.dto.onboarding.*;
@@ -15,6 +16,7 @@ import com.facilon.app.module.client.model.master.MasterBrokers;
 import com.facilon.app.repository.AuthorizedUserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +44,7 @@ public class IntroducedInvestorService {
     private final PasswordEncoder passwordEncoder;
     private final InvestorNotificationService notificationService;
     private final MasterBrokersRepository brokersRepository;
+    private final ObjectProvider<DynamicsCrmService> dynamicsCrmServiceProvider;
 
     public IntroInvestorResponseDto processStep1(IntroInvestorStep1Dto dto) {
         String uniqueCode = generateUniqueCode();
@@ -145,6 +148,11 @@ public class IntroducedInvestorService {
                 .registerAs(temp.getInvestorRegisterAs() != null ? Integer.parseInt(temp.getInvestorRegisterAs()) : 1)
                 .verifyStatus(2)
                 .incorpCountry(0)
+                // Carry the pre-existing Dataverse CRM IDs from intro_investor_temp so later
+                // write-backs (bank, passport, personal-info PATCHes) target the right record.
+                .dvContactId(temp.getSsContactId())
+                .dvInvestorGuid(temp.getIntroInvestorId())
+                .dvInvestorSsId(temp.getIntroDvInvestorSsId())
                 .build();
         investor.setTenant(tenant);
         investor = investorRepository.save(investor);
@@ -176,6 +184,26 @@ public class IntroducedInvestorService {
                 );
             } catch (Exception e) {
                 log.warn("Failed to send registration complete notification to broker", e);
+            }
+        }
+
+        // Dataverse write-back (aligned to Laravel InvestorController::introduce_investor_register_step4_insert_data L2127)
+        // Three PATCH calls: update contact name/email/mobile → re-assert investor link →
+        // update ss_investors.ss_*introduceind fields.
+        DynamicsCrmService crm = dynamicsCrmServiceProvider.getIfAvailable();
+        if (crm != null && temp.getSsContactId() != null && temp.getIntroInvestorId() != null) {
+            try {
+                crm.completeIntroducedInvestor(
+                        temp.getSsContactId(),
+                        temp.getIntroInvestorId(),
+                        temp.getIntroFirstName(),
+                        temp.getIntroMiddleName(),
+                        temp.getIntroLastName(),
+                        temp.getIntroEmail(),
+                        temp.getIntroMobile()
+                );
+            } catch (Exception e) {
+                log.error("Dataverse introduced-investor write-back failed for {}: {}", code, e.getMessage(), e);
             }
         }
 

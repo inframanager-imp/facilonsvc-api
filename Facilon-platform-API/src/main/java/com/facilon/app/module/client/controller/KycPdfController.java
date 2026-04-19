@@ -40,11 +40,13 @@ public class KycPdfController {
      */
     @GetMapping("/kyc-form")
     @Operation(summary = "Download KYC form PDF for current user")
-    public ResponseEntity<byte[]> downloadKycPdf(Authentication auth) {
+    public ResponseEntity<byte[]> downloadKycPdf(
+            Authentication auth,
+            @RequestParam(value = "engine", required = false) String engine) {
         String uniqueCode = resolveUniqueCode(auth);
-        log.info("Generating KYC PDF (FreeMarker) for investor: {}", uniqueCode);
+        log.info("Generating KYC PDF for investor: {} (engine override={})", uniqueCode, engine);
 
-        byte[] pdf = kycPdfService.generateKycPdf(uniqueCode);
+        byte[] pdf = kycPdfService.generateKycPdf(uniqueCode, engine);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);

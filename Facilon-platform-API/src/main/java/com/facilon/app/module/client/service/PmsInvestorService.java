@@ -1,17 +1,22 @@
 package com.facilon.app.module.client.service;
 
 import com.facilon.app.config.TenantContextHolder;
+import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.integration.graphemail.GraphEmailService;
 import com.facilon.app.model.AuthorizedUser;
 import com.facilon.app.model.Tenant;
+import com.facilon.app.integration.dynamics.DataverseInvestorAssignmentDto;
+import com.facilon.app.module.client.dto.onboarding.PmsInviteResponseDto;
 import com.facilon.app.module.client.dto.onboarding.PmsInvestorRegistrationDto;
 import com.facilon.app.module.client.dto.onboarding.VerificationResponseDto;
+import com.facilon.app.module.client.model.IntroInvestorTemp;
 import com.facilon.app.module.client.model.Investor;
 import com.facilon.app.module.client.model.InvestorPmsDetails;
 import com.facilon.app.module.client.model.UserPersonalInformation;
 import com.facilon.app.module.client.model.master.MasterPmsBanks;
 import com.facilon.app.module.client.model.master.MasterPmsPlans;
 import com.facilon.app.module.client.model.master.MasterPortfolioManagers;
+import com.facilon.app.module.client.repository.IntroInvestorTempRepository;
 import com.facilon.app.module.client.repository.InvestorPmsDetailsRepository;
 import com.facilon.app.module.client.repository.InvestorRepository;
 import com.facilon.app.module.client.repository.MasterPmsBanksRepository;
@@ -50,11 +55,108 @@ public class PmsInvestorService {
     private final MasterPortfolioManagersRepository pmsManagerRepository;
     private final MasterPmsPlansRepository pmsPlanRepository;
     private final MasterPmsBanksRepository pmsBankRepository;
+    private final IntroInvestorTempRepository introTempRepository;
     private final PasswordEncoder passwordEncoder;
 
     /** Optional — wired only when Graph email credentials are present. */
     @Autowired(required = false)
     private GraphEmailService graphEmailService;
+
+    /** Optional — wired only when Dataverse credentials are present (dev/test may run without). */
+    @Autowired(required = false)
+    private DynamicsCrmService dynamicsCrmService;
+
+    /**
+     * Public invite-link entry point.  Direct port of Laravel
+     * {@code InvestorController::introduce_investor_register_pms_main_step_show}
+     * (L3774–L3894).
+     *
+     * <p>The broker / PM embeds a URL like {@code /introduce-investor-pms/INV-1744}
+     * in the invitation email they send to the prospective investor.  When the
+     * investor clicks it:
+     * <ol>
+     *   <li>We fetch {@code ss_investors?$filter=ss_name eq 'INV-1744'} from Dataverse.</li>
+     *   <li>Generate a fresh local {@code unique_code}.</li>
+     *   <li>Persist an {@code intro_investor_temp} row with all the broker / product / plan /
+     *       bank references pre-populated from Dataverse (Laravel's commented-out insert
+     *       at L3866–3867 is now the de-facto behaviour).</li>
+     *   <li>Return the pre-populated data to the wizard so the investor never has to
+     *       select broker / product / plan / bank — they're carried through to the
+     *       final {@code /register} call via the unique code.</li>
+     * </ol>
+     *
+     * @throws RuntimeException if no Dataverse record matches the {@code introduceId}
+     *                          — matches Laravel's fatal {@code die()} on token failure,
+     *                          but with a proper HTTP error path instead of dying.
+     */
+    public PmsInviteResponseDto acceptPmsInvite(String introduceId) {
+        if (introduceId == null || introduceId.isBlank()) {
+            throw new IllegalArgumentException("introduceId is required");
+        }
+        if (dynamicsCrmService == null) {
+            throw new IllegalStateException(
+                    "Dataverse is not configured; invite-link lookup requires Dynamics CRM access");
+        }
+
+        DataverseInvestorAssignmentDto assignment = dynamicsCrmService
+                .fetchInvestorAssignmentBySsName(introduceId)
+                .orElseThrow(() -> new RuntimeException(
+                        "No Dataverse ss_investors record found for introduceId: " + introduceId));
+
+        Tenant tenant = TenantContextHolder.getContext().getTenant();
+        String uniqueCode = generateUniqueCode();
+
+        // Laravel also reads ss_firstnameintroduceind / middle / last / email / mobile fields
+        // (L3829–L3833) which we persist on the temp row so the wizard can pre-fill step 2.
+        IntroInvestorTemp temp = IntroInvestorTemp.builder()
+                .uniqueCodeDb(uniqueCode)
+                .introFirstName(assignment.getIntroFirstName())
+                .introMiddleName(assignment.getIntroMiddleName())
+                .introLastName(assignment.getIntroLastName())
+                .introEmail(assignment.getIntroEmail())
+                .introMobile(assignment.getIntroMobile())
+                .introDvInvestorSsId(assignment.getIntroDvInvestorSsId())
+                .introInvestorId(assignment.getSsInvestorId())
+                .introDvNationality(assignment.getIntroDvNationality())
+                .ssBrokerValue(assignment.getSsBrokerValue())
+                .brokerPreferredBank(assignment.getBrokerPreferredBank())
+                .investRouteValue(assignment.getInvestRouteValue())
+                .serviceProviderType(assignment.getServiceProviderType())
+                .ssIpRecords(assignment.getSsIpRecords())
+                .ssApplicableToSlt(assignment.getSsApplicableToSlt())
+                .ssInvestorTypeValue(assignment.getSsInvestorTypeValue())
+                .ssProductValue(assignment.getSsProductValue())
+                .ssBrokeragePlanValue(assignment.getSsBrokeragePlanValue())
+                .investorRegisterAs("Self")      // Laravel hard-codes "Self" (L3884)
+                .status(2)                        // Laravel sets $status = 2 at L3880
+                .build();
+        temp.setTenant(tenant);
+        introTempRepository.save(temp);
+
+        log.info("PMS invite accepted: introduceId={}, uniqueCode={}, broker={}, product={}",
+                introduceId, uniqueCode, assignment.getSsBrokerValue(), assignment.getSsProductValue());
+
+        return PmsInviteResponseDto.builder()
+                .uniqueCode(uniqueCode)
+                .introduceId(introduceId)
+                .dvInvestorGuid(assignment.getSsInvestorId())
+                .firstName(assignment.getIntroFirstName())
+                .middleName(assignment.getIntroMiddleName())
+                .lastName(assignment.getIntroLastName())
+                .email(assignment.getIntroEmail())
+                .mobile(assignment.getIntroMobile())
+                .brokerGuid(assignment.getSsBrokerValue())
+                .brokerPreferredBankGuid(assignment.getBrokerPreferredBank())
+                .productGuid(assignment.getSsProductValue())
+                .brokeragePlanGuid(assignment.getSsBrokeragePlanValue())
+                .investorRouteGuid(assignment.getInvestRouteValue())
+                .investorTypeGuid(assignment.getSsInvestorTypeValue())
+                .nationalityGuid(assignment.getIntroDvNationality())
+                .serviceProviderType(assignment.getServiceProviderType())
+                .ssIpRecords(assignment.getSsIpRecords())
+                .ssApplicableToSlt(assignment.getSsApplicableToSlt())
+                .build();
+    }
 
     public VerificationResponseDto registerPmsInvestor(PmsInvestorRegistrationDto dto) {
         validatePmsReferences(dto);
@@ -147,6 +249,35 @@ public class PmsInvestorService {
         personalInfo.setTenant(tenant);
         personalInfoRepository.save(personalInfo);
 
+        // Dataverse write-back — direct port of Laravel
+        // InvestorController::introduce_investor_pms_register_step4_insert_data (L4350+).
+        // Three-call sequence: POST /contacts → POST /ss_investors (linked) → PATCH /contacts (link back).
+        // Failure here is logged but does NOT fail the local registration — matches Laravel which
+        // fires the cURL calls without checking the response status code.  The operator can replay
+        // the write-back later via an admin endpoint if needed.
+        if (dynamicsCrmService != null) {
+            try {
+                DynamicsCrmService.InvestorCrmIds ids = dynamicsCrmService.registerInvestorInDataverse(
+                        dto.getFirstName(),
+                        dto.getMiddleName(),
+                        dto.getLastName(),
+                        dto.getEmail(),
+                        dto.getMobilePhone()
+                );
+                if (ids != null) {
+                    investor.setDvContactId(ids.contactId);
+                    investor.setDvInvestorGuid(ids.investorGuid);
+                    investor.setDvInvestorSsId(ids.investorSsName);
+                    investorRepository.save(investor);
+                    log.info("PMS investor pushed to Dataverse: uniqueCode={}, contactId={}, investorGuid={}, ssName={}",
+                            uniqueCode, ids.contactId, ids.investorGuid, ids.investorSsName);
+                }
+            } catch (Exception e) {
+                log.error("Dataverse write-back failed for PMS investor {}: {}",
+                        uniqueCode, e.getMessage(), e);
+            }
+        }
+
         // Send welcome / credentials email (non-fatal on failure).
         tryDeliverWelcomeEmail(dto);
 
@@ -172,6 +303,10 @@ public class PmsInvestorService {
             investor.setCountryOfResidence(dto.getLegalCountryId().intValue());
         }
         // "Yes" / "No" radios captured verbatim (Laravel stores them as strings too)
+        if (dto.getResident() != null) {
+            // Laravel L4486: investors.residence_type stores the "Are you a resident of India?" radio.
+            investor.setResidenceType(dto.getResident());
+        }
         if (dto.getPancard() != null) {
             investor.setPancardStatus(dto.getPancard());
         }

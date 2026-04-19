@@ -21,6 +21,16 @@ import com.facilon.app.module.client.model.master.MasterBanks;
 import com.facilon.app.module.client.model.master.MasterBrokerBanks;
 import com.facilon.app.module.client.repository.IntroInvestorTempRepository;
 import com.facilon.app.module.client.repository.InvestorBankDetailsRepository;
+import com.facilon.app.module.client.repository.MasterTitleRepository;
+import com.facilon.app.module.client.repository.MasterGenderRepository;
+import com.facilon.app.module.client.repository.MasterMaritalStatusRepository;
+import com.facilon.app.module.client.repository.MasterCountriesRepository;
+import com.facilon.app.module.client.repository.MasterNationalityRepository;
+import com.facilon.app.module.client.model.master.MasterTitle;
+import com.facilon.app.module.client.model.master.MasterGender;
+import com.facilon.app.module.client.model.master.MasterMaritalStatus;
+import com.facilon.app.module.client.model.master.MasterCountries;
+import com.facilon.app.module.client.model.master.MasterNationality;
 import com.facilon.app.module.client.repository.InvestorContactDetailsRepository;
 import com.facilon.app.module.client.repository.InvestorConsentsRepository;
 import com.facilon.app.module.client.repository.InvestorExperienceRepository;
@@ -75,7 +85,21 @@ public class ClientProfileService {
     private final MasterBrokerBanksRepository masterBrokerBanksRepository;
     private final MasterBanksRepository masterBanksRepository;
     private final MasterAccountsRepository masterAccountsRepository;
-    
+
+    // Master-data repositories used to resolve local business IDs into Dataverse GUIDs
+    // for @odata.bind lookups (mirrors Laravel's inline master_title / master_gender /
+    // master_maritial_status lookups in InnerPageController::personal_information_submit).
+    @Autowired(required = false)
+    private MasterTitleRepository masterTitleRepository;
+    @Autowired(required = false)
+    private MasterGenderRepository masterGenderRepository;
+    @Autowired(required = false)
+    private MasterMaritalStatusRepository masterMaritalStatusRepository;
+    @Autowired(required = false)
+    private MasterCountriesRepository masterCountriesRepository;
+    @Autowired(required = false)
+    private MasterNationalityRepository masterNationalityRepository;
+
     @Autowired(required = false)
     private DynamicsCrmService dynamicsCrmService;
     
@@ -334,7 +358,120 @@ public class ClientProfileService {
         // Update status
         updateSectionStatus(investor, "personalInfo");
 
+        // Dataverse write-back (aligned to Laravel InnerPageController::personal_information_submit L2442)
+        // PATCH /contacts(<contactId>) with ~20 fields + 8 @odata.bind lookups, then optional
+        // POST /contacts for father / mother with link-back PATCH.
+        if (dynamicsCrmService != null && investor.getDvContactId() != null) {
+            String contactId = investor.getDvContactId();
+
+            DynamicsCrmService.PersonalInfoPayload payload = new DynamicsCrmService.PersonalInfoPayload();
+            payload.firstName          = info.getInvestorFirstName();
+            payload.middleName         = info.getInvestorMiddleName();
+            payload.lastName           = info.getInvestorLastName();
+            payload.panNumber          = firstNonBlank(info.getUserPanNo(), info.getTaxPanNo());
+            payload.dateOfBirth        = info.getUserDob() != null ? info.getUserDob().toString() : null;
+            payload.citizenshipOptionSetValue = 100000001;           // Laravel hard-codes (L2459)
+            payload.titleGuid          = resolveTitleGuid(info.getNameTitle());
+            payload.genderGuid         = resolveGenderGuid(info.getGender());
+            payload.maritalStatusGuid  = resolveMaritalStatusGuid(info.getMaritalStatus());
+            payload.countryOfBirthGuid = resolveCountryGuid(info.getCountryDob());
+            payload.nationalityGuid    = resolveNationalityGuid(info.getCitizenship());
+            payload.fatherTitleGuid    = resolveTitleGuid(info.getFatherNameTitle());
+            payload.motherTitleGuid    = resolveTitleGuid(info.getMotherNameTitle());
+            payload.spouseTitleGuid    = resolveTitleGuid(info.getSpouseNameTitle());
+            payload.fathersMiddleName  = info.getFathersMiddleName();
+            payload.fathersLastName    = info.getFathersLastName();
+            payload.motherMiddleName   = info.getMotherMiddleName();
+            payload.motherLastName     = info.getMotherLastName();
+            payload.spouseFirstName    = info.getSpouseName();
+            payload.spouseLastName     = info.getSpouseLastName();
+            payload.spouseMaidenName   = info.getSpouseMaidenName();
+
+            dynamicsCrmService.pushPersonalInformation(contactId, payload);
+
+            // Family contacts — Laravel only POSTs if first name is non-blank (L2476, L2504)
+            if (info.getFathersFirstName() != null && !info.getFathersFirstName().isBlank()) {
+                dynamicsCrmService.createFamilyContact(contactId,
+                        info.getFathersFirstName(),
+                        info.getFathersMiddleName(),
+                        info.getFathersLastName(),
+                        100000002,                                  // Laravel customertypecode (Father)
+                        payload.fatherTitleGuid);
+            }
+            if (info.getMotherFirstName() != null && !info.getMotherFirstName().isBlank()) {
+                dynamicsCrmService.createFamilyContact(contactId,
+                        info.getMotherFirstName(),
+                        info.getMotherMiddleName(),
+                        info.getMotherLastName(),
+                        100000003,                                  // Laravel customertypecode (Mother)
+                        payload.motherTitleGuid);
+            }
+        }
+
         return toPersonalInfoDto(info);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Local-ID → Dataverse-GUID resolvers (mirror Laravel inline master lookups
+    // in InnerPageController::personal_information_submit L2435–L2438).
+    //
+    // Input may be either the Dataverse GUID already (36-char with hyphens) or
+    // the local master-table {@code id} column — we pass through GUIDs verbatim
+    // and look up integers against the synced master tables.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private boolean looksLikeGuid(String s) {
+        return s != null && s.length() == 36 && s.charAt(8) == '-';
+    }
+
+    private Integer tryParseInt(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Integer.valueOf(s.trim()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private String resolveTitleGuid(String localIdOrGuid) {
+        if (looksLikeGuid(localIdOrGuid)) return localIdOrGuid;
+        Integer id = tryParseInt(localIdOrGuid);
+        if (id == null || masterTitleRepository == null) return null;
+        return masterTitleRepository.findByBusinessId(id)
+                .map(MasterTitle::getSsTitleId)
+                .orElse(null);
+    }
+
+    private String resolveGenderGuid(String localIdOrGuid) {
+        if (looksLikeGuid(localIdOrGuid)) return localIdOrGuid;
+        Integer id = tryParseInt(localIdOrGuid);
+        if (id == null || masterGenderRepository == null) return null;
+        return masterGenderRepository.findByBusinessId(id)
+                .map(MasterGender::getSsGenderId)
+                .orElse(null);
+    }
+
+    private String resolveMaritalStatusGuid(String localIdOrGuid) {
+        if (looksLikeGuid(localIdOrGuid)) return localIdOrGuid;
+        Integer id = tryParseInt(localIdOrGuid);
+        if (id == null || masterMaritalStatusRepository == null) return null;
+        return masterMaritalStatusRepository.findByBusinessId(id)
+                .map(MasterMaritalStatus::getSsMaritalStatusId)
+                .orElse(null);
+    }
+
+    private String resolveCountryGuid(String localIdOrGuid) {
+        if (looksLikeGuid(localIdOrGuid)) return localIdOrGuid;
+        Integer id = tryParseInt(localIdOrGuid);
+        if (id == null || masterCountriesRepository == null) return null;
+        return masterCountriesRepository.findById(id)
+                .map(MasterCountries::getSsCountryId)
+                .orElse(null);
+    }
+
+    private String resolveNationalityGuid(String localIdOrGuid) {
+        if (looksLikeGuid(localIdOrGuid)) return localIdOrGuid;
+        if (masterNationalityRepository == null) return null;
+        // MasterNationality has findBySsNationalityId but no findByBusinessId — we only
+        // pass through recognised GUIDs, since Laravel stores citizenship as a GUID already
+        // (InnerPageController.php L2460 uses $citizenship directly as the bind value).
+        return null;
     }
 
     /**
@@ -392,6 +529,20 @@ public class ClientProfileService {
 
         // Update status
         updateSectionStatus(investor, "passport");
+
+        // Dataverse write-back (aligned to Laravel InnerPageController::investor_passport_submit L2668)
+        // PATCH /contacts(<contactId>) — ss_passportno / ss_dateofissue / ss_passportexpirydate /
+        // ss_dateofbecomingnri / ss_numberofyearsabroad / ss_validupto.
+        if (dynamicsCrmService != null && investor.getDvContactId() != null) {
+            dynamicsCrmService.pushPassportDetails(
+                    investor.getDvContactId(),
+                    passport.getPassportNumber(),
+                    passport.getPassportIssueDate() != null ? passport.getPassportIssueDate().toString() : null,
+                    passport.getPassportExpiryDate() != null ? passport.getPassportExpiryDate().toString() : null,
+                    passport.getPassportDateNonResident() != null ? passport.getPassportDateNonResident().toString() : null,
+                    passport.getPassportNoYearsAbroad() != null ? String.valueOf(passport.getPassportNoYearsAbroad()) : null
+            );
+        }
 
         return toPassportDto(passport);
     }
@@ -767,6 +918,20 @@ public class ClientProfileService {
         // Update status for residentialStatus
         updateSectionStatus(investor, "residentialStatus");
 
+        // Dataverse write-back (aligned to Laravel InnerPageController::investor_residential_status_submit L2857)
+        // PATCH /contacts(<contactId>) — ss_ocicardno / ss_visanumber / ss_aadhaar /
+        // ss_visaexpirydate / ss_visaissuedate.
+        if (dynamicsCrmService != null && investor.getDvContactId() != null) {
+            dynamicsCrmService.pushResidentialStatus(
+                    investor.getDvContactId(),
+                    status.getUserOciCardNo(),
+                    status.getUserVisaNumber(),
+                    firstNonBlank(status.getUserAadharNo(), status.getAadharNumber()),
+                    status.getUserVisaExpiryDate() != null ? status.getUserVisaExpiryDate().toString() : null,
+                    status.getUserVisaIssuerDate() != null ? status.getUserVisaIssuerDate().toString() : null
+            );
+        }
+
         return toResidentialDto(status);
     }
 
@@ -818,6 +983,21 @@ public class ClientProfileService {
 
         // Update status for taxInfo
         updateSectionStatus(investor, "taxInformation");
+
+        // Dataverse write-back (aligned to Laravel InnerPageController::investor_tax_info_submit L2984)
+        // PATCH /contacts(<contactId>) — ss_identificationnumber / ss_taxpayeridentificationnotype /
+        // ss_taxidentificationnumberorequivalent / ss_taxresidencycertificatedate /
+        // ss_taxresidencycertificateno.
+        if (dynamicsCrmService != null && investor.getDvContactId() != null) {
+            dynamicsCrmService.pushTaxInformation(
+                    investor.getDvContactId(),
+                    taxInfo.getTaxIdentificationNumber(),
+                    taxInfo.getTaxIdentificationNumberType(),
+                    taxInfo.getTaxResidencyCertificateDate() != null
+                            ? taxInfo.getTaxResidencyCertificateDate().toString() : null,
+                    taxInfo.getTaxResidencyCertificateNo()
+            );
+        }
 
         return toTaxDto(taxInfo);
     }
@@ -871,6 +1051,24 @@ public class ClientProfileService {
 
         // Update status for bankDetails
         updateSectionStatus(investor, "bankDetails");
+
+        // Dataverse write-back (aligned to Laravel InnerPageController::investor_bank_details_submit L3198)
+        // PATCH /ss_investors(<investorid>) with the 6 bank fields.  Fire-and-forget like Laravel:
+        // Dataverse failure is logged but does not fail the local submission.
+        if (dynamicsCrmService != null && investor.getDvInvestorGuid() != null) {
+            dynamicsCrmService.pushBankDetails(
+                    investor.getDvInvestorGuid(),
+                    bank.getAccountHolderName(),
+                    bank.getBankName(),
+                    bank.getBranchName(),
+                    bank.getBankAddress(),
+                    bank.getAccountNumber(),
+                    bank.getIfscCode()
+            );
+        } else if (dynamicsCrmService != null) {
+            log.debug("Skipping Dataverse bank push for investor {} – dv_investor_guid not set (pre-registration investor)",
+                    investor.getUniqueCode());
+        }
 
         return toBankDto(bank);
     }

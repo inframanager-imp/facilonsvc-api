@@ -1,5 +1,6 @@
 package com.facilon.app.module.client.controller;
 
+import com.facilon.app.module.client.dto.onboarding.PmsInviteResponseDto;
 import com.facilon.app.module.client.dto.onboarding.PmsInvestorRegistrationDto;
 import com.facilon.app.module.client.dto.onboarding.PmsOtpRequestDto;
 import com.facilon.app.module.client.dto.onboarding.PmsOtpResponseDto;
@@ -37,6 +38,27 @@ public class PmsInvestorController {
     public ResponseEntity<VerificationResponseDto> registerPmsInvestor(
             @Valid @RequestBody PmsInvestorRegistrationDto dto) {
         VerificationResponseDto response = pmsInvestorService.registerPmsInvestor(dto);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public invite-link entry — mirrors Laravel
+     * {@code GET /introduce-investor-pms/{introduce_id}} (route web.php L200).
+     *
+     * <p>The broker / PM sends the investor an email containing a URL of the form
+     * {@code https://&lt;host&gt;/investor/pms/invite/INV-1744}.  The frontend calls this
+     * endpoint on page-load, receives the pre-populated assignment data + a fresh
+     * {@code uniqueCode}, and carries the code through the remaining wizard steps
+     * so the investor never has to select broker / product / plan / bank.
+     */
+    @GetMapping("/invite/{introduceId}")
+    @Operation(summary = "Accept PMS invite link",
+            description = "Laravel parity: fetches ss_investors by ss_name, seeds an "
+                    + "intro_investor_temp row with the broker / product / plan / bank references, "
+                    + "and returns the pre-populated data + a fresh uniqueCode for the wizard.")
+    public ResponseEntity<PmsInviteResponseDto> acceptInvite(@PathVariable String introduceId) {
+        log.info("PMS invite lookup for introduceId={}", introduceId);
+        PmsInviteResponseDto response = pmsInvestorService.acceptPmsInvite(introduceId);
         return ResponseEntity.ok(response);
     }
 

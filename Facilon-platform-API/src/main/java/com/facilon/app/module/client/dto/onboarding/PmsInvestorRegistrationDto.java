@@ -66,6 +66,13 @@ public class PmsInvestorRegistrationDto {
     private String fullName;
 
     // --- Conditional KYC ---
+    /**
+     * "Yes" | "No" — Laravel source field: {@code Resident}.
+     * <p>The Indian-path branch of {@code introduce_investor_pms_register_step4_insert_data}
+     * (L4411, L4486) stores this on {@code investors.residence_type}.  Required when
+     * {@code nationality} resolves to "Indian"; ignored otherwise.
+     */
+    private String resident;
     /** "Yes" | "No". Laravel source field: pancard. */
     private String pancard;
     /** "Yes" | "No". Laravel source field: oci_card. */

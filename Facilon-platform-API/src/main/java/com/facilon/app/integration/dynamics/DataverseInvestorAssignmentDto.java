@@ -55,4 +55,27 @@ public class DataverseInvestorAssignmentDto {
 
     /** _ss_nationality_value — nationality GUID */
     private String introDvNationality;
+
+    // ── Laravel-parity fields also read at L3829–L3842 of
+    //    InvestorController::introduce_investor_register_pms_main_step_show.
+    //    These are the introduced-investor personal details that the broker / PM
+    //    populated on the CRM side before sending the invite email.
+
+    /** ss_firstnameintroduceind */
+    private String introFirstName;
+
+    /** ss_middlenameintroduceind */
+    private String introMiddleName;
+
+    /** ss_lastnameintroduceind */
+    private String introLastName;
+
+    /** ss_mobilephoneintroduceind */
+    private String introMobile;
+
+    /** ss_iprecords */
+    private String ssIpRecords;
+
+    /** ss_applicabletoslt */
+    private String ssApplicableToSlt;
 }

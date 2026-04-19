@@ -20,6 +20,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.HashMap;
 import java.util.List;
@@ -75,27 +76,58 @@ public class DynamicsCrmService {
      * even when the {@code intro_investor_temp} row is missing.
      */
     public Optional<DataverseInvestorAssignmentDto> fetchInvestorAssignmentByEmail(String email) {
-        if (tokenProvider == null || email == null || email.isBlank()) {
-            return Optional.empty();
-        }
+        if (email == null || email.isBlank()) return Optional.empty();
+        // OData: escape single quotes in email (e.g. O'Brien → O''Brien)
+        String safeEmail = email.trim().replace("'", "''");
+        return fetchInvestorAssignmentByFilter("ss_emailintroduceind eq '" + safeEmail + "'", "email=" + email);
+    }
+
+    /**
+     * Fetch the Dataverse {@code ss_investors} row by the display-name identifier
+     * (e.g. {@code "INV-1744"}) that is embedded in the broker/PM-sent invite link.
+     *
+     * <p>Direct port of Laravel
+     * {@code InvestorController::introduce_investor_register_pms_main_step_show}
+     * (L3808): {@code GET /ss_investors?$filter=ss_name eq '<introduceId>'}.
+     *
+     * <p>Used by the public invite-link endpoint to pre-populate the PMS
+     * registration wizard with the introducer's broker / product / plan / bank
+     * references so the investor does not have to supply them.
+     */
+    public Optional<DataverseInvestorAssignmentDto> fetchInvestorAssignmentBySsName(String ssName) {
+        if (ssName == null || ssName.isBlank()) return Optional.empty();
+        String safeName = ssName.trim().replace("'", "''");
+        return fetchInvestorAssignmentByFilter("ss_name eq '" + safeName + "'", "ssName=" + ssName);
+    }
+
+    /**
+     * Shared implementation for both {@link #fetchInvestorAssignmentByEmail(String)} and
+     * {@link #fetchInvestorAssignmentBySsName(String)} — the only variable is the OData {@code $filter}.
+     */
+    private Optional<DataverseInvestorAssignmentDto> fetchInvestorAssignmentByFilter(String odataFilter,
+                                                                                     String logKey) {
+        if (tokenProvider == null) return Optional.empty();
         String token = tokenProvider.getDynamicsToken();
         if (token == null) {
-            log.warn("fetchInvestorAssignmentByEmail: no Dynamics token");
+            log.warn("fetchInvestorAssignment: no Dynamics token ({})", logKey);
             return Optional.empty();
         }
         String baseUrl = tokenProvider.getDynamicsBaseUrl();
         if (baseUrl == null) return Optional.empty();
 
-        // OData: escape single quotes in email (e.g. O'Brien → O''Brien)
-        String safeEmail = email.trim().replace("'", "''");
         // Explicit $select so lookup columns (_ss_*_value) are returned consistently across environments
         String select = "ss_investorid,ss_emailintroduceind,_ss_broker_value,ss_serviceprovidertype,"
                 + "_ss_product_value,_ss_brokerageplan_value,_ss_investorroute_value,_ss_brokerpreferredbank_value,"
-                + "_ss_investortype_value,ss_name,_ss_nationality_value";
+                + "_ss_investortype_value,ss_name,_ss_nationality_value,"
+                // Laravel also reads these two (L3841–L3842)
+                + "ss_iprecords,ss_applicabletoslt,"
+                // Personal name / email / mobile for pre-fill
+                + "ss_firstnameintroduceind,ss_middlenameintroduceind,ss_lastnameintroduceind,"
+                + "ss_mobilephoneintroduceind";
         URI uri = UriComponentsBuilder
                 .fromHttpUrl(baseUrl + "/ss_investors")
                 .queryParam("$select", select)
-                .queryParam("$filter", "ss_emailintroduceind eq '" + safeEmail + "'")
+                .queryParam("$filter", odataFilter)
                 .queryParam("$top", "1")
                 .build().encode().toUri();
 
@@ -109,7 +141,7 @@ public class DynamicsCrmService {
                     uri, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
             JsonNode body = resp.getBody();
             if (body == null || !body.has("value") || body.get("value").isEmpty()) {
-                log.info("fetchInvestorAssignmentByEmail: no ss_investors record for {}", email);
+                log.info("fetchInvestorAssignment: no ss_investors record for {}", logKey);
                 return Optional.empty();
             }
             JsonNode row = body.get("value").get(0);
@@ -139,12 +171,19 @@ public class DynamicsCrmService {
                     .introDvNationality(firstNonBlank(
                             text(row, "_ss_nationality_value"),
                             parseLookupGuidFromBind(text(row, "_ss_nationality_value@odata.bind"))))
+                    // Laravel-parity extras (L3829–L3842 of introduce_investor_register_pms_main_step_show)
+                    .introFirstName(text(row, "ss_firstnameintroduceind"))
+                    .introMiddleName(text(row, "ss_middlenameintroduceind"))
+                    .introLastName(text(row, "ss_lastnameintroduceind"))
+                    .introMobile(text(row, "ss_mobilephoneintroduceind"))
+                    .ssIpRecords(text(row, "ss_iprecords"))
+                    .ssApplicableToSlt(text(row, "ss_applicabletoslt"))
                     .build();
-            log.info("fetchInvestorAssignmentByEmail: found broker={} product={} for {}",
-                    dto.getSsBrokerValue(), dto.getSsProductValue(), email);
+            log.info("fetchInvestorAssignment: found broker={} product={} for {}",
+                    dto.getSsBrokerValue(), dto.getSsProductValue(), logKey);
             return Optional.of(dto);
         } catch (Exception e) {
-            log.warn("fetchInvestorAssignmentByEmail failed for {}: {}", email, e.getMessage());
+            log.warn("fetchInvestorAssignment failed for {}: {}", logKey, e.getMessage());
             return Optional.empty();
         }
     }
@@ -1970,5 +2009,606 @@ public class DynamicsCrmService {
             log.error("Failed to fetch investor type name for GUID {}: {}", investorTypeGuid, e.getMessage());
             return null;
         }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Dataverse write-back helpers  (Phase 1 of Laravel investor-write port)
+    // ─────────────────────────────────────────────────────────────────────────
+    // These helpers centralise the token + headers + error-handling logic so
+    // every POST/PATCH method below stays focused on the payload itself, which
+    // is where the field-for-field alignment with Laravel matters.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Build an {@code @odata.bind} URL for a Dataverse lookup-write.
+     *
+     * <p>Laravel pattern (InvestorController.php L779, L817):
+     * <pre>
+     *   "ss_InvestorName@odata.bind":
+     *       "https://fportalvapt.crm8.dynamics.com/api/data/v9.2/contacts(&lt;id&gt;)"
+     * </pre>
+     * Java callers pass {@code (entitySet, guid)}; the host portion is taken from
+     * {@link DynamicsTokenProvider#getDynamicsBaseUrl()} so env-specific tenants work.
+     *
+     * @param entitySet Dataverse entity set name (e.g. {@code "contacts"}, {@code "ss_investors"})
+     * @param guid      target record GUID (no braces)
+     * @return          fully-qualified URL suitable for a {@code @odata.bind} value,
+     *                  or {@code null} if the token provider or GUID is missing
+     */
+    public String buildODataBind(String entitySet, String guid) {
+        if (guid == null || guid.isBlank() || tokenProvider == null) return null;
+        String baseUrl = tokenProvider.getDynamicsBaseUrl();
+        if (baseUrl == null) return null;
+        String clean = guid.trim().replaceAll("^\\{|\\}$", "");
+        return baseUrl + "/" + entitySet + "(" + clean + ")";
+    }
+
+    /**
+     * POST a new record to a Dataverse entity set and return the created record body.
+     *
+     * <p>Laravel pattern (InvestorController.php L731–L764, L768–L798):
+     * cURL POST with {@code Prefer: return=representation} so the response body
+     * includes the new record's GUID for follow-up PATCHes.
+     *
+     * <p>Throws on failure — callers that need the response body (e.g. the
+     * 3-call registration sequence) cannot continue without the new GUID, so
+     * surfacing the error is correct here.
+     *
+     * @return the response body as {@link JsonNode}, containing the new record's
+     *         primary-key field (e.g. {@code contactid}, {@code ss_investorid}).
+     */
+    public JsonNode postEntity(String entitySet, Map<String, Object> body) {
+        HttpHeaders headers = dataverseHeaders(true);
+        if (headers == null) {
+            throw new IllegalStateException("Dataverse token/baseUrl unavailable for POST " + entitySet);
+        }
+        String url = tokenProvider.getDynamicsBaseUrl() + "/" + entitySet;
+        try {
+            ResponseEntity<JsonNode> resp = restTemplate.exchange(
+                    URI.create(url), HttpMethod.POST, new HttpEntity<>(body, headers), JsonNode.class);
+            log.info("Dataverse POST {} → {}", entitySet, resp.getStatusCode());
+            return resp.getBody();
+        } catch (Exception e) {
+            log.error("Dataverse POST {} failed: {}", entitySet, e.getMessage());
+            throw new RuntimeException("Dataverse POST " + entitySet + " failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * PATCH an existing record in a Dataverse entity set.
+     *
+     * <p>Laravel pattern (InnerPageController.php L3198, InvestorController.php L815):
+     * cURL PATCH without {@code Prefer: return=representation} — fire-and-forget
+     * semantics.  Laravel does not check the response; we log + return a boolean
+     * so callers can decide whether to surface the failure to the user.
+     *
+     * @param entitySet Dataverse entity set (e.g. {@code "contacts"}, {@code "ss_investors"})
+     * @param guid      record primary-key GUID
+     * @param body      JSON payload (may contain {@code @odata.bind} values built via
+     *                  {@link #buildODataBind(String, String)})
+     * @return          {@code true} on 2xx; {@code false} otherwise.  The Laravel
+     *                  flow ignores the return and always shows a success flash —
+     *                  callers may mirror that, or surface the error.
+     */
+    public boolean patchEntity(String entitySet, String guid, Map<String, Object> body) {
+        if (guid == null || guid.isBlank()) {
+            log.warn("Dataverse PATCH {} skipped: blank guid", entitySet);
+            return false;
+        }
+        HttpHeaders headers = dataverseHeaders(false);
+        if (headers == null) {
+            log.warn("Dataverse PATCH {} skipped: token/baseUrl unavailable", entitySet);
+            return false;
+        }
+        String clean = guid.trim().replaceAll("^\\{|\\}$", "");
+        String url = tokenProvider.getDynamicsBaseUrl() + "/" + entitySet + "(" + clean + ")";
+        try {
+            ResponseEntity<Void> resp = restTemplate.exchange(
+                    URI.create(url), HttpMethod.PATCH, new HttpEntity<>(body, headers), Void.class);
+            log.info("Dataverse PATCH {}({}) → {}", entitySet, clean, resp.getStatusCode());
+            return resp.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.error("Dataverse PATCH {}({}) failed: {}", entitySet, clean, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Shared header builder for Dataverse write calls.
+     *
+     * @param returnRepresentation set {@code Prefer: return=representation} so the
+     *                             server returns the created/updated row — needed for POSTs
+     *                             that must read back the new primary key.
+     * @return populated headers, or {@code null} if the Dataverse token/baseUrl is not
+     *         available (caller should abort the write).
+     */
+    private HttpHeaders dataverseHeaders(boolean returnRepresentation) {
+        if (tokenProvider == null) return null;
+        String token = tokenProvider.getDynamicsToken();
+        String baseUrl = tokenProvider.getDynamicsBaseUrl();
+        if (token == null || baseUrl == null) return null;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("OData-MaxVersion", "4.0");
+        headers.set("OData-Version", "4.0");
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        if (returnRepresentation) {
+            headers.set("Prefer", "return=representation");
+        }
+        return headers;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Phase E — Bank / settlement details write-back
+    // Laravel: InnerPageController::investor_bank_details_submit (L3198–L3209)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Push investor bank / settlement details to Dataverse.
+     *
+     * <p>Laravel call:
+     * <pre>
+     *   PATCH /ss_investors(&lt;investorId&gt;)
+     *   {
+     *     "ss_beneficiarysname":        &lt;beneficiary_name&gt;,
+     *     "ss_bankname":                &lt;bank_name&gt;,
+     *     "ss_branchfpi":               &lt;branch_name&gt;,
+     *     "ss_bankaddressbranchaddress":&lt;bank_branch_address&gt;,
+     *     "ss_bankaccountnumber":       &lt;bank_account_number&gt;,
+     *     "ss_ifsccode":                &lt;bank_ifsc_code&gt;
+     *   }
+     * </pre>
+     * Field names match Laravel byte-for-byte so the CRM side does not need any
+     * mapping changes.  Values are sent plain (not encrypted) because Laravel
+     * only encrypts for local DB storage, not for the Dataverse push.
+     */
+    public boolean pushBankDetails(String investorId,
+                                   String beneficiaryName,
+                                   String bankName,
+                                   String branchName,
+                                   String bankBranchAddress,
+                                   String bankAccountNumber,
+                                   String bankIfscCode) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ss_beneficiarysname", beneficiaryName);
+        body.put("ss_bankname", bankName);
+        body.put("ss_branchfpi", branchName);
+        body.put("ss_bankaddressbranchaddress", bankBranchAddress);
+        body.put("ss_bankaccountnumber", bankAccountNumber);
+        body.put("ss_ifsccode", bankIfscCode);
+        return patchEntity("ss_investors", investorId, body);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Phase D — Passport / Residential / Tax PATCH write-backs
+    // Laravel: InnerPageController (passport L2668, residential L2857, tax L2984)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Push passport details to Dataverse.
+     * <p>Laravel: {@code PATCH /contacts(<contactId>)} (L2668–L2679)
+     * <pre>
+     *   ss_passportno, ss_dateofissue, ss_passportexpirydate,
+     *   ss_dateofbecomingnri, ss_numberofyearsabroad, ss_validupto
+     * </pre>
+     * Dates are ISO-8601 strings ({@code yyyy-MM-dd}) to match Laravel's Carbon format.
+     */
+    public boolean pushPassportDetails(String contactId,
+                                       String passportNumber,
+                                       String passportDateOfIssue,
+                                       String passportValidUpto,
+                                       String passportDateNonResident,
+                                       String passportNoYearsAbroad) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ss_passportno", passportNumber);
+        body.put("ss_dateofissue", passportDateOfIssue);
+        body.put("ss_passportexpirydate", passportValidUpto);
+        body.put("ss_dateofbecomingnri", passportDateNonResident);
+        body.put("ss_numberofyearsabroad", passportNoYearsAbroad);
+        body.put("ss_validupto", passportValidUpto);
+        return patchEntity("contacts", contactId, body);
+    }
+
+    /**
+     * Push residential status (OCI/visa/aadhaar) to Dataverse.
+     * <p>Laravel: {@code PATCH /contacts(<contactId>)} (L2857–L2867)
+     * <pre>
+     *   ss_ocicardno, ss_visanumber, ss_aadhaar, ss_visaexpirydate, ss_visaissuedate
+     * </pre>
+     * Values are sent plain — Laravel stores encrypted locally but sends plain to Dataverse.
+     */
+    public boolean pushResidentialStatus(String contactId,
+                                         String ociCardNo,
+                                         String visaNumber,
+                                         String aadhaar,
+                                         String visaExpiryDate,
+                                         String visaIssueDate) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ss_ocicardno", ociCardNo);
+        body.put("ss_visanumber", visaNumber);
+        body.put("ss_aadhaar", aadhaar);
+        body.put("ss_visaexpirydate", visaExpiryDate);
+        body.put("ss_visaissuedate", visaIssueDate);
+        return patchEntity("contacts", contactId, body);
+    }
+
+    /**
+     * Push tax information to Dataverse.
+     * <p>Laravel: {@code PATCH /contacts(<contactId>)} (L2984–L2994)
+     * <pre>
+     *   ss_identificationnumber, ss_taxpayeridentificationnotype,
+     *   ss_taxidentificationnumberorequivalent,
+     *   ss_taxresidencycertificatedate, ss_taxresidencycertificateno
+     * </pre>
+     * Note: Laravel sends {@code ss_identificationnumber} AND
+     * {@code ss_taxidentificationnumberorequivalent} with the SAME value; preserved here.
+     */
+    public boolean pushTaxInformation(String contactId,
+                                      String taxIdentificationNumber,
+                                      String taxIdentificationNumberType,
+                                      String taxResidencyCertificateDate,
+                                      String taxResidencyCertificateNo) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ss_identificationnumber", taxIdentificationNumber);
+        body.put("ss_taxpayeridentificationnotype", taxIdentificationNumberType);
+        body.put("ss_taxidentificationnumberorequivalent", taxIdentificationNumber);
+        body.put("ss_taxresidencycertificatedate", taxResidencyCertificateDate);
+        body.put("ss_taxresidencycertificateno", taxResidencyCertificateNo);
+        return patchEntity("contacts", contactId, body);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Phase C — Personal-info PATCH + father / mother family contacts
+    // Laravel: InnerPageController::personal_information_submit (L2442–L2530)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Input value-object for the big personal-info PATCH.  Using a single DTO
+     * keeps the method signature sane; all fields are optional (null values
+     * are still written to Dataverse so the CRM-side may clear previously-set
+     * values when the user removes them — matches Laravel which sends all
+     * keys unconditionally).
+     */
+    public static class PersonalInfoPayload {
+        public String firstName;
+        public String middleName;
+        public String lastName;
+        public String panNumber;
+        public String dateOfBirth;                 // ISO-8601 yyyy-MM-dd
+        public Integer citizenshipOptionSetValue;  // Laravel hard-codes 100000001
+        // Lookup GUIDs (Dataverse master IDs, resolved against master tables before call)
+        public String titleGuid;                   // ss_titles
+        public String genderGuid;                  // ss_genders (Laravel hard-codes the Male GUID in one branch)
+        public String maritalStatusGuid;           // ss_maritalstatuses
+        public String countryOfBirthGuid;          // ss_countries
+        public String nationalityGuid;             // ss_nationalities
+        public String fatherTitleGuid;             // ss_titles
+        public String motherTitleGuid;             // ss_titles
+        public String spouseTitleGuid;             // ss_titles
+        // Family name fields
+        public String fathersMiddleName;
+        public String fathersLastName;
+        public String motherMiddleName;
+        public String motherLastName;
+        public String spouseFirstName;
+        public String spouseLastName;
+        public String spouseMaidenName;
+    }
+
+    /**
+     * Push main personal-information PATCH (the large lookup-heavy one).
+     * <p>Laravel: {@code PATCH /contacts(<contactId>)} at L2442 with ~20 fields and
+     * 8 {@code @odata.bind} lookups.  Only non-null GUIDs are written — Laravel
+     * always sends the binds, but an unresolved GUID would fail the whole PATCH;
+     * we defensively drop null binds so a partially-configured investor still
+     * pushes the scalar fields.
+     */
+    public boolean pushPersonalInformation(String contactId, PersonalInfoPayload p) {
+        if (p == null) return false;
+        Map<String, Object> body = new LinkedHashMap<>();
+        putBindIfPresent(body, "ss_Title", "ss_titles", p.titleGuid);
+        body.put("firstname", p.firstName);
+        body.put("middlename", p.middleName);
+        body.put("lastname", p.lastName);
+        putBindIfPresent(body, "ss_Gender", "ss_genders", p.genderGuid);
+        body.put("ss_panno", p.panNumber);
+        body.put("ss_middlenamefather", p.fathersMiddleName);
+        body.put("ss_middlenamemother", p.motherMiddleName);
+        body.put("ss_spousesmaidenname", p.spouseMaidenName);
+        putBindIfPresent(body, "ss_MaritalStatus", "ss_maritalstatuses", p.maritalStatusGuid);
+        body.put("ss_dateofbirth", p.dateOfBirth);
+        putBindIfPresent(body, "ss_CountryofBirth", "ss_countries", p.countryOfBirthGuid);
+        body.put("ss_citizenship", p.citizenshipOptionSetValue);
+        putBindIfPresent(body, "ss_Nationality", "ss_nationalities", p.nationalityGuid);
+        body.put("ss_lastnamefather", p.fathersLastName);
+        body.put("ss_lastnamemother", p.motherLastName);
+        body.put("ss_firstnamespouse", p.spouseFirstName);
+        body.put("ss_lastnamespouse", p.spouseLastName);
+        putBindIfPresent(body, "ss_TitleFather", "ss_titles", p.fatherTitleGuid);
+        putBindIfPresent(body, "ss_TitleMother", "ss_titles", p.motherTitleGuid);
+        putBindIfPresent(body, "ss_TitleSpouse", "ss_titles", p.spouseTitleGuid);
+        return patchEntity("contacts", contactId, body);
+    }
+
+    /**
+     * Create a family-member contact and link it back to the main contact.
+     * <p>Laravel: {@code POST /contacts} then {@code PATCH /contacts(<newId>)}
+     * with {@code ss_Contact@odata.bind} (L2478–L2502 for father, L2505–L2529 for mother).
+     * <p>Customer type codes used by Laravel:
+     * <ul>
+     *   <li>{@code 100000002} — Father</li>
+     *   <li>{@code 100000003} — Mother</li>
+     * </ul>
+     *
+     * @return the newly-created family-contact GUID, or {@code null} on failure.
+     */
+    public String createFamilyContact(String mainContactId,
+                                      String firstName,
+                                      String middleName,
+                                      String lastName,
+                                      int customerTypeCode,
+                                      String titleGuid) {
+        if (firstName == null || firstName.isBlank()) return null;
+
+        Map<String, Object> createBody = new LinkedHashMap<>();
+        createBody.put("firstname", firstName);
+        createBody.put("middlename", middleName);
+        createBody.put("lastname", lastName);
+        createBody.put("customertypecode", customerTypeCode);
+        putBindIfPresent(createBody, "ss_Title", "ss_titles", titleGuid);
+
+        JsonNode created;
+        try {
+            created = postEntity("contacts", createBody);
+        } catch (Exception e) {
+            log.error("createFamilyContact POST failed: {}", e.getMessage());
+            return null;
+        }
+        if (created == null || !created.has("contactid")) {
+            log.warn("createFamilyContact returned no contactid for {}", firstName);
+            return null;
+        }
+        String familyId = created.get("contactid").asText();
+
+        // Link back to the main contact via ss_Contact lookup
+        Map<String, Object> linkBody = new LinkedHashMap<>();
+        String mainBind = buildODataBind("contacts", mainContactId);
+        if (mainBind != null) {
+            // Laravel uses a relative URL ("/contacts(<id>)"); Dataverse accepts either —
+            // we use the absolute URL for consistency with other writes in this service.
+            linkBody.put("ss_Contact@odata.bind", mainBind);
+            patchEntity("contacts", familyId, linkBody);
+        }
+        return familyId;
+    }
+
+    /**
+     * Helper: add a Dataverse {@code @odata.bind} key to a payload iff the GUID
+     * is present.  Matches Laravel's string-concat {@code '/ss_titles(' . $guid . ')'}
+     * by delegating to {@link #buildODataBind(String, String)} which returns the
+     * fully-qualified URL expected by the org endpoint.
+     */
+    private void putBindIfPresent(Map<String, Object> body,
+                                  String logicalName,
+                                  String entitySet,
+                                  String guid) {
+        if (guid == null || guid.isBlank()) return;
+        String bindUrl = buildODataBind(entitySet, guid);
+        if (bindUrl != null) {
+            body.put(logicalName + "@odata.bind", bindUrl);
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Phase A — Self-registration 3-call sequence
+    // Laravel: InvestorController::investor_register_step4_insert_data (L727–L828)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Result holder for the 3-call investor registration sequence.
+     * <ul>
+     *   <li>{@code contactId}     — Dataverse {@code contacts.contactid} (GUID)
+     *   <li>{@code investorGuid}  — Dataverse {@code ss_investors.ss_investorid} (GUID)
+     *   <li>{@code investorSsName}— Dataverse {@code ss_investors.ss_name} (display, e.g. "INV-1744")
+     * </ul>
+     */
+    public static class InvestorCrmIds {
+        public final String contactId;
+        public final String investorGuid;
+        public final String investorSsName;
+        public InvestorCrmIds(String contactId, String investorGuid, String investorSsName) {
+            this.contactId = contactId;
+            this.investorGuid = investorGuid;
+            this.investorSsName = investorSsName;
+        }
+    }
+
+    /**
+     * Register a new investor in Dataverse.  Executes the three Laravel calls
+     * in order, exactly as {@code investor_register_step4_insert_data} does:
+     * <ol>
+     *   <li>{@code POST /contacts} with
+     *       {@code firstname / middlename / lastname / emailaddress1 / mobilephone}
+     *       and {@code Prefer: return=representation} — returns the new {@code contactid}.
+     *   <li>{@code POST /ss_investors} with a single lookup-bind
+     *       {@code ss_InvestorName@odata.bind} pointing at the new contact —
+     *       returns {@code ss_investorid} and {@code ss_name}.
+     *   <li>{@code PATCH /contacts(<contactId>)} with
+     *       {@code ss_LookuptoInvestor@odata.bind} pointing at the new investor,
+     *       closing the bidirectional link.
+     * </ol>
+     *
+     * <p>Error handling: if step 1 or 2 fails, the method throws — we cannot
+     * proceed without the GUIDs.  If step 3 fails, it is logged but not thrown
+     * because the contact and investor already exist in Dataverse; the link can
+     * be repaired later.  (Laravel swallows step-3 failures silently.)
+     *
+     * @return a populated {@link InvestorCrmIds}, or {@code null} if the
+     *         Dataverse configuration is missing (makes the caller a no-op).
+     */
+    public InvestorCrmIds registerInvestorInDataverse(String firstName,
+                                                      String middleName,
+                                                      String lastName,
+                                                      String email,
+                                                      String mobileNumber) {
+        if (tokenProvider == null || tokenProvider.getDynamicsBaseUrl() == null
+                || tokenProvider.getDynamicsToken() == null) {
+            log.warn("registerInvestorInDataverse: token/baseUrl unavailable; skipping CRM push");
+            return null;
+        }
+
+        // Step 1 — POST /contacts (must return contactid for the next call)
+        Map<String, Object> contactBody = new LinkedHashMap<>();
+        contactBody.put("firstname", firstName);
+        contactBody.put("middlename", middleName);
+        contactBody.put("lastname", lastName);
+        contactBody.put("emailaddress1", email);
+        contactBody.put("mobilephone", mobileNumber);
+
+        JsonNode contactResp = postEntity("contacts", contactBody);
+        if (contactResp == null || !contactResp.has("contactid")) {
+            throw new RuntimeException("Dataverse POST /contacts returned no contactid");
+        }
+        String contactId = contactResp.get("contactid").asText();
+        log.info("Dataverse contact created: {}", contactId);
+
+        // Step 2 — POST /ss_investors with contact lookup-bind (must return ss_investorid + ss_name)
+        Map<String, Object> investorBody = new LinkedHashMap<>();
+        String contactBind = buildODataBind("contacts", contactId);
+        investorBody.put("ss_InvestorName@odata.bind", contactBind);
+
+        JsonNode investorResp = postEntity("ss_investors", investorBody);
+        if (investorResp == null || !investorResp.has("ss_investorid")) {
+            throw new RuntimeException("Dataverse POST /ss_investors returned no ss_investorid");
+        }
+        String investorGuid = investorResp.get("ss_investorid").asText();
+        String investorSsName = investorResp.has("ss_name") ? investorResp.get("ss_name").asText(null) : null;
+        log.info("Dataverse investor created: {} ({})", investorSsName, investorGuid);
+
+        // Step 3 — PATCH contact to link back to investor (best-effort; Laravel ignores failures here)
+        Map<String, Object> linkBody = new LinkedHashMap<>();
+        String investorBind = buildODataBind("ss_investors", investorGuid);
+        if (investorBind != null) {
+            linkBody.put("ss_LookuptoInvestor@odata.bind", investorBind);
+            boolean linked = patchEntity("contacts", contactId, linkBody);
+            if (!linked) {
+                log.warn("Dataverse PATCH /contacts({}) link failed — contact + investor exist but are not bi-linked",
+                        contactId);
+            }
+        }
+
+        return new InvestorCrmIds(contactId, investorGuid, investorSsName);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Phase B — Introduced-investor variants (nextholder + PMS)
+    // Laravel: InvestorController::introduce_investor_register_step4_insert_data (L2124–L2200)
+    //          InvestorController::introduce_investor_nextholder_register_step4_submit (L1624+)
+    //          InvestorController::introduce_investor_pms_register_step4_insert_data (L4315+)
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Complete an introduced-investor record in Dataverse.
+     *
+     * <p>Unlike Phase A, the {@code contacts} and {@code ss_investors} records
+     * already exist (created by the broker / PMS when introducing the investor).
+     * Laravel runs three PATCH calls at L2127–L2200 of
+     * {@code InvestorController::introduce_investor_register_step4_insert_data}:
+     * <ol>
+     *   <li>{@code PATCH /contacts(contactId)} — overwrite placeholder name / email /
+     *       mobile with the actual introduced-investor values
+     *   <li>{@code PATCH /contacts(contactId)} — set
+     *       {@code ss_LookuptoInvestor@odata.bind} (repeat of Phase A step 3, in
+     *       case the broker did not link the records)
+     *   <li>{@code PATCH /ss_investors(investorGuid)} — set the
+     *       {@code ss_*introduceind} fields so the CRM side tracks the introduced
+     *       investor independently of the main contact fields
+     * </ol>
+     *
+     * <p>All three calls are best-effort (patchEntity returns a boolean that we
+     * log but don't throw on) — Laravel ignores individual failures and
+     * continues regardless.
+     *
+     * @return {@code true} iff all three PATCHes returned 2xx.
+     */
+    public boolean completeIntroducedInvestor(String contactId,
+                                              String investorGuid,
+                                              String firstName,
+                                              String middleName,
+                                              String lastName,
+                                              String email,
+                                              String mobileNumber) {
+        if (contactId == null || investorGuid == null) {
+            log.warn("completeIntroducedInvestor: contactId or investorGuid missing; aborting");
+            return false;
+        }
+
+        // Step 1 — PATCH /contacts with real names/email/mobile
+        Map<String, Object> contactBody = new LinkedHashMap<>();
+        contactBody.put("firstname", firstName);
+        contactBody.put("middlename", middleName);
+        contactBody.put("lastname", lastName);
+        contactBody.put("emailaddress1", email);
+        contactBody.put("mobilephone", mobileNumber);
+        boolean step1 = patchEntity("contacts", contactId, contactBody);
+
+        // Step 2 — PATCH /contacts linking back to investor (idempotent)
+        boolean step2 = true;
+        String investorBind = buildODataBind("ss_investors", investorGuid);
+        if (investorBind != null) {
+            Map<String, Object> linkBody = new LinkedHashMap<>();
+            linkBody.put("ss_LookuptoInvestor@odata.bind", investorBind);
+            step2 = patchEntity("contacts", contactId, linkBody);
+        }
+
+        // Step 3 — PATCH /ss_investors with the *_introduceind field family
+        Map<String, Object> investorBody = new LinkedHashMap<>();
+        investorBody.put("ss_firstnameintroduceind", firstName);
+        investorBody.put("ss_middlenameintroduceind", middleName);
+        investorBody.put("ss_lastnameintroduceind", lastName);
+        investorBody.put("ss_emailintroduceind", email);
+        investorBody.put("ss_mobilephoneintroduceind", mobileNumber);
+        boolean step3 = patchEntity("ss_investors", investorGuid, investorBody);
+
+        return step1 && step2 && step3;
+    }
+
+    /**
+     * Nextholder (joint-holder) variant of {@link #completeIntroducedInvestor}.
+     *
+     * <p>Laravel {@code introduce_investor_nextholder_register_step4_submit} (L1624)
+     * follows the Phase A 3-call pattern — POST contact, POST investor, PATCH link —
+     * because the nextholder is a newly-created contact + investor pair, not a
+     * pre-existing introduction.  This method therefore delegates to
+     * {@link #registerInvestorInDataverse} with the nextholder's details.
+     */
+    public InvestorCrmIds registerNextholderInDataverse(String firstName,
+                                                        String middleName,
+                                                        String lastName,
+                                                        String email,
+                                                        String mobileNumber) {
+        return registerInvestorInDataverse(firstName, middleName, lastName, email, mobileNumber);
+    }
+
+    /**
+     * PMS-channel variant of {@link #completeIntroducedInvestor}.
+     *
+     * <p>Laravel {@code introduce_investor_pms_register_step4_insert_data} (L4315)
+     * writes the same three PATCH calls but also updates
+     * {@code _ss_portfoliomanager_value} so the PMS record is correctly attributed.
+     * The PATCH payload is identical to {@link #completeIntroducedInvestor} — the
+     * caller supplies the appropriate contact/investor GUIDs from the PMS
+     * onboarding session.
+     */
+    public boolean completePmsIntroducedInvestor(String contactId,
+                                                 String investorGuid,
+                                                 String firstName,
+                                                 String middleName,
+                                                 String lastName,
+                                                 String email,
+                                                 String mobileNumber) {
+        return completeIntroducedInvestor(contactId, investorGuid, firstName, middleName, lastName, email, mobileNumber);
     }
 }

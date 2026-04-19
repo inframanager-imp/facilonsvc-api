@@ -1,10 +1,10 @@
 server:
-  port: 8082                 # Port on which the Spring Boot application will run
+  port: 8082                # Port on which the Spring Boot application will run
   servlet:
     context-path: /facilon # Context path for the application endpoints
 
 client:
-  port: 3000
+  port: 4200
   host: localhost
 
 
@@ -90,7 +90,7 @@ graph:
 dataverse:
   master-sync:
     # Run on startup: true = sync all master tables when the server boots
-    run-on-startup: true
+    run-on-startup: false
     # Cron expression — default: every day at 02:00 AM
     # Format: second minute hour day month weekday
     # Examples:
