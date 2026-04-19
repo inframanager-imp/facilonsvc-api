@@ -1,0 +1,189 @@
+{
+  "_notes": [
+    "Externalised mapping for Ventura NRI Account Opening booklet v28.",
+    "Loaded by KycFormMappingLoader; consumed by KycFormFieldExpander.",
+    "Validated on startup against field-inventory.json — typos fail fast, gaps are logged.",
+    "",
+    "Structure:",
+    "  direct      — DTO getter name -> single PDF widget (read via BeanWrapper.getPropertyValue).",
+    "  multiDirect — DTO getter name -> list of PDF widgets (same value fanned out).",
+    "  dateSplits  — DTO getter (dd-MM-yyyy string) -> list of [day,month,year] widget triplets.",
+    "  charSplits  — DTO getter -> list of {prefix,count}; value split one char per widget.",
+    "  constants   — PDF widget -> constant value (always set, regardless of DTO).",
+    "",
+    "Complex logic (checkbox-set expansion, POI/POA inference, NRI overrides) stays in Java."
+  ],
+
+  "direct": {
+    "namePrefix": "first_holder_prefix",
+    "firstName": "first_holder_first_name",
+    "middleName": "first_holder_middle_name",
+    "lastName": "first_holder_last_name",
+    "maidenTitle": "first_holder_maiden_prefix",
+    "maidenName": "first_holder_maiden_first_name",
+    "maidenMiddleName": "first_holder_maiden_middle_name",
+    "maidenLastName": "first_holder_maiden_last_name",
+    "fatherNameTitle": "first_holder_father_spouse_prefix",
+    "fathersFirstName": "first_holder_father_spouse_first_name",
+    "fathersMiddleName": "first_holder_father_spouse_middle_name",
+    "fathersLastName": "first_holder_father_spouse_last_name",
+    "motherNameTitle": "first_holder_mother_prefix",
+    "motherFirstName": "first_holder_mother_first_name",
+    "motherMiddleName": "first_holder_mother_middle_name",
+    "motherLastName": "first_holder_mother_last_name",
+    "panNumber": "first_holder_pan_number",
+    "aadhaarNumber": "first_holder_aadhaar_number",
+    "email": "first_holder_email",
+    "mobile": "first_holder_mobile_number",
+    "isdCode": "first_holder_mobile_std",
+    "incomeRange": "first_holder_gross_annual_income",
+    "occupationType": "first_holder_occupation_details",
+    "permAddress1": "first_holder_overseas_address_line_1",
+    "permAddress2": "first_holder_overseas_address_line_2",
+    "permCity": "first_holder_overseas_city",
+    "permState": "first_holder_overseas_state",
+    "permCountry": "first_holder_overseas_country",
+    "permPinCode": "first_holder_overseas_pin_code",
+    "corrAddress1": "first_holder_kyc_corres_line_1_a",
+    "corrAddress2": "first_holder_kyc_corres_line_2",
+    "fatcaClientCode": "first_holder_fatca_client_code",
+    "fatcaCountryBirthName": "first_holder_fatca_country_of_birth",
+    "fatcaCitizenshipName": "first_holder_fatca_country_of_citizenship",
+    "fatcaTaxResidenceName": "first_holder_fatca_residence_for_tax_purposes",
+    "fatcaTin": "first_holder_fatca_tin_i",
+    "netWorth": "bank_networth_amount_rs",
+    "bankBranchAddress": "bank_branch_address",
+    "bankDetailsStateName": "demat_bank_state",
+    "bankDetailsCountryName": "demat_bank_country",
+
+    "cityOfBirth": "first_holder_sec2_place_of_birth",
+    "countryOfBirthIsoCode": "first_holder_sec2_iso_country_code_birth",
+    "taxIdNumber": "first_holder_sec2_tax_identification_number",
+    "taxCountryIsoCode": "first_holder_sec2_iso_country_code_jurisdiction",
+
+    "rbiApprovalNumber": "demat_rbi_approval_reference_no",
+
+    "nominee1Name": "nominee_1_name",
+    "nominee2Name": "nominee_2_name",
+    "nominee3Name": "nominee_3_name",
+    "nominee1Share": "nominee_1_share_pct",
+    "nominee2Share": "nominee_2_share_pct",
+    "nominee3Share": "nominee_3_share_pct",
+    "nominee1Relation": "nominee_1_relationship",
+    "nominee2Relation": "nominee_2_relationship",
+    "nominee3Relation": "nominee_3_relationship",
+    "nominee1Dob": "nominee_1_dob",
+    "nominee2Dob": "nominee_2_dob",
+    "nominee3Dob": "nominee_3_dob",
+    "guardian1": "nominee_1_guardian_name",
+    "guardian2": "nominee_2_guardian_name",
+    "guardian3": "nominee_3_guardian_name"
+  },
+
+  "multiDirect": {
+    "applicantName": [
+      "cover_name_of_client",
+      "bank_beneficiary_name",
+      "bank_beneficiary_name_full",
+      "demat_account_holder_name",
+      "dis_booklet_sole_first_holder_name",
+      "acknowledgement_applicant_name",
+      "first_holder_fatca_signature_name",
+      "first_holder_fatca_self_cert_name"
+    ],
+    "currentDate": [
+      "letter_of_authority_date",
+      "mitc_date",
+      "aadhaar_consent_date",
+      "agreement_nomination_date",
+      "bank_networth_date",
+      "first_holder_fatca_signature_date",
+      "first_holder_fatca_self_cert_date",
+      "dis_booklet_date"
+    ],
+    "permCity": [
+      "first_holder_declaration_place",
+      "dis_booklet_place",
+      "ecn_declaration_place"
+    ],
+    "bankAccountNo": ["bank_account_no", "bank_account_no_full", "demat_bank_account_no"],
+    "ifscCode": ["bank_ifsc_code"],
+    "dpId": ["bank_dp_id", "bank_dp_id_full"],
+    "bankDetailsCity": ["bank_city_town", "demat_bank_city_town"],
+    "bankBranchAddress_demat": ["demat_bank_branch_address"],
+    "investorUniqueCode": ["cover_client_code", "bank_client_code"],
+    "clientId": ["cover_client_id"],
+    "remarks": ["first_holder_remarks_line_1"],
+    "fatcaTaxResidenceName_issue": ["first_holder_fatca_country_of_issue_i"],
+    "ecnEmail": ["trading_primary_email_id"],
+    "ecnSecondaryEmail": ["trading_secondary_email_id"]
+  },
+
+  "dateSplits": {
+    "dateOfBirth": [
+      ["first_holder_dob_day", "first_holder_dob_month", "first_holder_dob_year"]
+    ],
+    "currentDate": [
+      ["first_holder_declaration_date_dd", "first_holder_declaration_date_mm", "first_holder_declaration_date_yyyy"]
+    ]
+  },
+
+  "charSplits": {
+    "bankDetailsZipCode": [
+      {"prefix": "bank_pincode_char_", "count": 3},
+      {"prefix": "demat_bank_pincode_char_", "count": 6}
+    ],
+    "bankAccountNo": [
+      {"prefix": "bank_account_no_char_", "count": 13}
+    ],
+    "ifscCode": [
+      {"prefix": "bank_ifsc_code_char_", "count": 6},
+      {"prefix": "bank_ifsc_char_", "count": 16},
+      {"prefix": "demat_ifsc_code_char_", "count": 11}
+    ],
+    "micrNo": [
+      {"prefix": "bank_micr_char_", "count": 6},
+      {"prefix": "bank_micr_no_char_", "count": 5},
+      {"prefix": "demat_micr_no_char_", "count": 7}
+    ],
+    "dpId": [
+      {"prefix": "bank_dpid_char_", "count": 3}
+    ]
+  },
+
+  "constants": {
+    "first_holder_app_type_new": "1",
+    "first_holder_account_type_normal": "1",
+    "first_holder_kyc_number": "",
+    "first_holder_mobile_self": "1",
+    "first_holder_source_of_wealth": "",
+    "trading_contract_note_electronic_checkbox": "1",
+    "trading_rights_obligations_electronic_checkbox": "1",
+    "trading_internet_wireless_yes_checkbox": "1",
+    "trading_name_of_stock_broker": "Ventura Securities Limited",
+    "trading_any_other_information": "",
+    "bank_beneficiary_id_bo_id": "",
+    "bank_beneficiary_id_bo_id_full": "",
+    "bank_gst_no": "",
+    "bank_exchange": "NSE/BSE",
+    "bank_office_use_equity_commodity_dp": "1",
+    "demat_branch_code": "",
+    "demat_scheme_code": "",
+    "ddpi_option1_yes": "1",
+    "ddpi_option2_yes": "1",
+    "ddpi_option3_yes": "1",
+    "ddpi_delivery_electronic": "1",
+    "ddpi_signing_first_holder": "1",
+    "depository_scheme_selection_a_with_poa": "1",
+    "depository_bsda_declaration_selection": "1",
+    "dis_booklet_option1_wish_to_receive": "1",
+    "letter_of_authority_settlement_quarterly": "1",
+    "agreement_doc_photograph": "1",
+    "agreement_doc_pan": "1",
+    "agreement_doc_aadhaar": "1",
+    "agreement_doc_saving_bank_proof": "1",
+    "agreement_doc_address_proof": "1",
+    "agreement_doc_demat_proof": "1",
+    "agreement_iwe_declaration": "1"
+  }
+}
