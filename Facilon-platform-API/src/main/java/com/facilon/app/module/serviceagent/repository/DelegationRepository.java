@@ -54,4 +54,27 @@ public interface DelegationRepository extends JpaRepository<InvestorServiceAgent
             @Param("investorId") Long investorId,
             @Param("tenantId") Long tenantId
     );
+
+    /**
+     * Delegations whose {@code validTo} is before the supplied date AND are still
+     * marked {@code ACTIVE}.  Drives the nightly expiry sweep that moves them
+     * to status {@code EXPIRED} + {@code isActive = false}.
+     */
+    @Query("SELECT d FROM InvestorServiceAgentDelegation d " +
+           "WHERE d.status = 'ACTIVE' " +
+           "AND d.isActive = true " +
+           "AND d.validTo IS NOT NULL " +
+           "AND d.validTo < :today")
+    List<InvestorServiceAgentDelegation> findExpiredActiveDelegations(@Param("today") LocalDate today);
+
+    /**
+     * All active delegations currently held by a given Service Agent across all
+     * investors — used when an SA is deactivated to cascade-revoke the set.
+     */
+    @Query("SELECT d FROM InvestorServiceAgentDelegation d " +
+           "WHERE d.serviceAgentId = :serviceAgentId " +
+           "AND d.isActive = true " +
+           "AND d.status IN ('ACTIVE','PENDING')")
+    List<InvestorServiceAgentDelegation> findOpenDelegationsByServiceAgent(
+            @Param("serviceAgentId") Long serviceAgentId);
 }

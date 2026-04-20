@@ -6,10 +6,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface ServiceAgentRepository extends JpaRepository<ServiceAgent, Long> {
+
+    /** All agents belonging to a given Service Provider (within the current tenant). */
+    @Query("SELECT s FROM ServiceAgent s " +
+           "WHERE s.serviceProviderId = :serviceProviderId " +
+           "AND s.tenant.id = :tenantId " +
+           "ORDER BY s.fullName")
+    List<ServiceAgent> findByServiceProviderIdAndTenantId(
+            @Param("serviceProviderId") Long serviceProviderId,
+            @Param("tenantId") Long tenantId);
     
     Optional<ServiceAgent> findByAuthorizedUser_Id(Long authorizedUserId);
     

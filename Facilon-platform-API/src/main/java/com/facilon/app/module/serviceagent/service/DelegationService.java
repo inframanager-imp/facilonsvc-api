@@ -29,6 +29,7 @@ public class DelegationService {
     private final DelegationRepository delegationRepository;
     private final ServiceAgentRepository serviceAgentRepository;
     private final InvestorRepository investorRepository;
+    private final DelegationNotificationService notifier;
 
     @Transactional
     public DelegationDto grantDelegation(Long authorizedUserId, DelegationCreateDto dto) {
@@ -133,6 +134,9 @@ public class DelegationService {
         delegationRepository.save(delegation);
 
         log.info("[DelegationService] Revoked delegation {} by investor {}", delegationId, investor.getId());
+
+        ServiceAgent sa = serviceAgentRepository.findById(delegation.getServiceAgentId()).orElse(null);
+        notifier.notifyRevoked(delegation, investor, sa, delegation.getRevocationReason());
     }
 
     @Transactional(readOnly = true)
@@ -324,6 +328,7 @@ public class DelegationService {
                 delegation.getCanUploadDocuments(), delegation.getCanSubmitForms());
 
         ServiceAgent sa = serviceAgentRepository.findById(delegation.getServiceAgentId()).orElse(null);
+        notifier.notifyAccepted(delegation, investor, sa);
         return mapToDto(delegation, investor, sa);
     }
 
@@ -353,6 +358,9 @@ public class DelegationService {
         delegationRepository.save(delegation);
 
         log.info("[DelegationService] Investor {} rejected delegation {}", investor.getId(), delegationId);
+
+        ServiceAgent sa = serviceAgentRepository.findById(delegation.getServiceAgentId()).orElse(null);
+        notifier.notifyRejected(delegation, investor, sa, reason);
     }
 
     @Transactional

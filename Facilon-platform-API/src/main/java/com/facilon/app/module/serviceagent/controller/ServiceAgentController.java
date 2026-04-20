@@ -6,10 +6,12 @@ import com.facilon.app.exception.ResourceNotFoundException;
 import com.facilon.app.module.serviceagent.dto.AuditLogDto;
 import com.facilon.app.module.serviceagent.dto.ServiceAgentDto;
 import com.facilon.app.module.serviceagent.dto.ServiceAgentInvestorDto;
+import com.facilon.app.module.serviceagent.dto.ServiceAgentProfileUpdateDto;
 import com.facilon.app.module.serviceagent.model.ServiceAgent;
 import com.facilon.app.module.serviceagent.repository.ServiceAgentRepository;
 import com.facilon.app.module.serviceagent.service.DelegationService;
 import com.facilon.app.module.serviceagent.service.ServiceAgentAuditService;
+import com.facilon.app.module.serviceagent.service.ServiceAgentService;
 import com.facilon.app.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,6 +40,7 @@ public class ServiceAgentController {
     private final ServiceAgentRepository serviceAgentRepository;
     private final DelegationService delegationService;
     private final ServiceAgentAuditService auditService;
+    private final ServiceAgentService serviceAgentService;
 
     @GetMapping("/profile")
     @Operation(summary = "Get my Service Agent profile")
@@ -70,6 +73,21 @@ public class ServiceAgentController {
                 .build();
 
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Self-service profile edit.  Only non-administrative fields are
+     * writable — login email, agent code, service-provider id, and the
+     * active flag are intentionally read-only here.
+     */
+    @PutMapping("/profile")
+    @Operation(summary = "Update my Service Agent profile")
+    public ResponseEntity<ServiceAgentDto> updateMyProfile(
+            @RequestBody ServiceAgentProfileUpdateDto dto,
+            Authentication auth) {
+        UserPrincipal principal = (UserPrincipal) auth.getPrincipal();
+        ServiceAgentDto updated = serviceAgentService.updateMyProfile(principal.getId(), dto);
+        return ResponseEntity.ok(updated);
     }
 
     @GetMapping("/investors")
