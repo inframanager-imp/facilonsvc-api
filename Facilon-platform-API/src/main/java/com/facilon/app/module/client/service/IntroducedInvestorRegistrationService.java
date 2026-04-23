@@ -407,12 +407,19 @@ public class IntroducedInvestorRegistrationService {
         user = authorizedUserRepository.save(user);
 
         // Create investor record
+        Integer nationalityId = parseNationality(dto.getNationality());
+        Integer residenceId = parseCountryOfResidence(dto.getCountryOfResidence());
+        Integer registerAs = "Self".equals(dto.getSelfOrLegalEntity()) ? 1 : 2;
+        String investorType = determineInvestorTypeName(
+                registerAs, nationalityId, residenceId,
+                dto.getPanCardStatus(), dto.getIndianOrigin(), dto.getOciCardStatus());
+
         Investor investor = Investor.builder()
                 .authorizedUser(user)
                 .uniqueCode(dto.getUniqueCode())
-                .registerAs("Self".equals(dto.getSelfOrLegalEntity()) ? 1 : 2)
+                .registerAs(registerAs)
                 .market(1)
-                .nationality(parseNationality(dto.getNationality()))
+                .nationality(nationalityId)
                 .pancardStatus(dto.getPanCardStatus())
                 .indianOrigin(dto.getIndianOrigin())
                 .ociCardStatus(dto.getOciCardStatus())
@@ -421,13 +428,14 @@ public class IntroducedInvestorRegistrationService {
                 .verifyStatus(2)
                 .dvInvestorSsId(session.getDataverseInvestorGuid())
                 .dvContactId(contactId)
-                .countryOfResidence(parseCountryOfResidence(dto.getCountryOfResidence()))
+                .countryOfResidence(residenceId)
                 .whatsappConsent(dto.getAgreeForWhatsapp() != null && dto.getAgreeForWhatsapp() ? 1 : 0)
                 .entityName(dto.getEntityName())
                 .entityNameRepresentative(
                         dto.getEntityName() != null ? session.getFirstName() + " " + session.getLastName() : null)
                 .companyCapacity(dto.getRepresentativeCapacity())
                 .securityRegulated(dto.getSecurityRegulated())
+                .investorType(investorType)
                 .build();
         investor.setTenant(tenant);
         investor = investorRepository.save(investor);
@@ -650,6 +658,53 @@ public class IntroducedInvestorRegistrationService {
             log.error("Failed to parse nationality GUID {}: {}", nationalityGuid, e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Determine the investor_type enum string from the step-4 form inputs so
+     * the introduced-investor row is populated at registration completion
+     * (matching what the regular self-register flow does). Laravel's
+     * introduced flow prepared but never wrote this value; the later
+     * ClientOnboardingService.determineInvestorType(...) call re-derives the
+     * same value from the same columns, so setting it here is safe and
+     * consistent.
+     *
+     * Returns null when we cannot confidently pick a type (e.g. nationality
+     * not resolved) — keeping behaviour as before in that edge case so the
+     * onboarding step can fill it in later.
+     */
+    private String determineInvestorTypeName(Integer registerAs, Integer nationalityId,
+                                             Integer countryOfResidenceId,
+                                             String pancardStatus, String indianOrigin,
+                                             String ociCardStatus) {
+        if (registerAs == null) return null;
+        boolean isIndividual = registerAs == 1;
+        boolean isIndiaNationality = isIndiaId(nationalityId);
+        boolean isIndiaResidence = isIndiaId(countryOfResidenceId);
+        boolean isIndiaIncorporation = !isIndividual && isIndiaResidence;
+        boolean hasPan = "yes".equalsIgnoreCase(pancardStatus);
+        boolean hasOci = "yes".equalsIgnoreCase(ociCardStatus);
+        Boolean isPio = indianOrigin == null ? null : "yes".equalsIgnoreCase(indianOrigin);
+        if (isIndividual && nationalityId == null) return null;
+
+        try {
+            return com.facilon.app.module.client.model.InvestorType.determineType(
+                    isIndividual, isIndiaNationality, isIndiaIncorporation,
+                    isIndiaResidence, hasPan, isPio, hasOci).name();
+        } catch (Exception e) {
+            log.warn("determineInvestorTypeName failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * India matches the legacy IDs used by ClientOnboardingService.isIndiaNationality —
+     * 1 (older seed) and 240 (current seed). Centralised here so the
+     * introduced-flow type inference uses the same rule as the onboarding
+     * re-evaluation downstream.
+     */
+    private static boolean isIndiaId(Integer id) {
+        return id != null && (id == 1 || id == 240);
     }
 
     /**
