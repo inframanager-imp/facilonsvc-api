@@ -8,4 +8,6 @@
     <include file="classpath:/db/changelog/changelog-tenant-config.xml" relativeToChangelogFile="false"/>
     <include file="classpath:/db/changelog/changelog-dsr.xml" relativeToChangelogFile="false"/>
     <include file="classpath:/db/changelog/changelog-service-agent.xml" relativeToChangelogFile="false"/>
+    <include file="classpath:/db/changelog/changelog-kyc-documents.xml" relativeToChangelogFile="false"/>
+    <include file="classpath:/db/changelog/changelog-profile-fixes.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

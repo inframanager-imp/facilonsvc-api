@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!--
+        KYC Smart Upload schema changes.
+        Plan of record: KYC_DOCUMENT_PLAN.md §3.2
+        - Extends kyc_documents with metadata for OCR / validation / expiry / versioning
+        - Adds kyc_document_fields  (one row per ORCReader ExtractedField)
+        - Adds kyc_document_discrepancies (rule violations from KycValidationEngine)
+    -->
+
+    <changeSet id="kyc-smartupload-1" author="facilon">
+        <sql>
+            ALTER TABLE kyc_documents
+                ADD COLUMN document_number VARCHAR(60) NULL,
+                ADD COLUMN issue_date DATE NULL,
+                ADD COLUMN expiry_date DATE NULL,
+                ADD COLUMN expiry_notified_at DATETIME NULL,
+                ADD COLUMN ocr_run_id VARCHAR(40) NULL,
+                ADD COLUMN ocr_model_version VARCHAR(60) NULL,
+                ADD COLUMN ocr_confidence DECIMAL(3,2) NULL,
+                ADD COLUMN validation_status VARCHAR(20) NULL,
+                ADD COLUMN replaced_by_document_id BIGINT NULL,
+                ADD COLUMN address_proof_type VARCHAR(40) NULL,
+                ADD COLUMN uses_aadhaar_for_address TINYINT(1) NULL
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-2" author="facilon">
+        <sql>
+            CREATE INDEX idx_kyc_documents_replaced_by ON kyc_documents (replaced_by_document_id)
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-3" author="facilon">
+        <sql>
+            CREATE INDEX idx_kyc_documents_expiry ON kyc_documents (expiry_date)
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-4" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS kyc_document_fields (
+                id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+                kyc_document_id  BIGINT NOT NULL,
+                field_name       VARCHAR(100) NOT NULL,
+                field_value      TEXT NULL,
+                confidence       DECIMAL(3,2) NULL,
+                page             INT NULL,
+                created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_kdf_document_id (kyc_document_id),
+                CONSTRAINT fk_kdf_kyc_document FOREIGN KEY (kyc_document_id)
+                    REFERENCES kyc_documents (id) ON DELETE CASCADE
+            )
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-5" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS kyc_document_discrepancies (
+                id                BIGINT AUTO_INCREMENT PRIMARY KEY,
+                kyc_document_id   BIGINT NOT NULL,
+                canonical_source  VARCHAR(30) NOT NULL,
+                field_name        VARCHAR(100) NULL,
+                expected_value    TEXT NULL,
+                observed_value    TEXT NULL,
+                severity          VARCHAR(20) NOT NULL,
+                created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_kdd_document_id (kyc_document_id),
+                CONSTRAINT fk_kdd_kyc_document FOREIGN KEY (kyc_document_id)
+                    REFERENCES kyc_documents (id) ON DELETE CASCADE
+            )
+        </sql>
+    </changeSet>
+
+    <!-- Confirmation + profile-import audit (Looks right / Something's wrong flow). -->
+
+    <changeSet id="kyc-smartupload-6" author="facilon">
+        <sql>
+            ALTER TABLE kyc_documents ADD COLUMN confirmed_at DATETIME NULL
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-7" author="facilon">
+        <sql>
+            ALTER TABLE investor ADD COLUMN kyc_verified_at DATETIME NULL
+        </sql>
+    </changeSet>
+
+    <changeSet id="kyc-smartupload-8" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS kyc_profile_import_audit (
+                id                   BIGINT AUTO_INCREMENT PRIMARY KEY,
+                investor_unique_id   VARCHAR(64) NOT NULL,
+                source_document_id   BIGINT NOT NULL,
+                source_document_type VARCHAR(30) NOT NULL,
+                target_field         VARCHAR(80) NOT NULL,
+                old_value            TEXT NULL,
+                new_value            TEXT NULL,
+                imported_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_kpia_investor (investor_unique_id),
+                INDEX idx_kpia_source_doc (source_document_id)
+            )
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

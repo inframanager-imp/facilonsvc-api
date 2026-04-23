@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -68,6 +70,45 @@ public class KycDocuments extends TenantEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    // ----- KYC Smart Upload extensions (KYC_DOCUMENT_PLAN §3.2) -----
+
+    @Column(name = "document_number", length = 60)
+    private String documentNumber;
+
+    @Column(name = "issue_date")
+    private LocalDate issueDate;
+
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
+
+    @Column(name = "expiry_notified_at")
+    private LocalDateTime expiryNotifiedAt;
+
+    @Column(name = "ocr_run_id", length = 40)
+    private String ocrRunId;
+
+    @Column(name = "ocr_model_version", length = 60)
+    private String ocrModelVersion;
+
+    @Column(name = "ocr_confidence", precision = 3, scale = 2)
+    private BigDecimal ocrConfidence;
+
+    @Column(name = "validation_status", length = 20)
+    private String validationStatus;
+
+    @Column(name = "replaced_by_document_id")
+    private Long replacedByDocumentId;
+
+    @Column(name = "address_proof_type", length = 40)
+    private String addressProofType;
+
+    @Column(name = "uses_aadhaar_for_address")
+    private Boolean usesAadhaarForAddress;
+
+    /** Set when the investor has reviewed the extracted fields and clicked "Looks right". */
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
 
     @PrePersist
     protected void onCreate() {

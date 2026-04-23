@@ -69,6 +69,9 @@ public class InvestorNomination extends TenantEntity {
     @Column(name = "nominee_postal_code")
     private String nomineePostalCode;
 
+    @Column(name = "nominee_country")
+    private String nomineeCountry;
+
     @Column(name = "is_minor")
     private Boolean isMinor;
 

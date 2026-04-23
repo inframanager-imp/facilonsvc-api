@@ -141,6 +141,10 @@ public class Investor extends TenantEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Set when all mandatory KYC slots are VALID + user-confirmed. Drives the "KYC complete" gate. */
+    @Column(name = "kyc_verified_at")
+    private LocalDateTime kycVerifiedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

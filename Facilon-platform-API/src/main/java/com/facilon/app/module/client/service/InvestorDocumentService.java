@@ -727,13 +727,22 @@ public class InvestorDocumentService {
             Boolean verifiedInDynamics = (Boolean) dynDoc.getOrDefault("ss_verification_done", false);
             String documentMasterUrl = (String) dynDoc.get("ss_doc_master_url"); // SharePoint URL for downloadable templates
             
-            // Try to find matching local upload by description or document_master_id
+            // Try to find matching local upload by description, document_master_id,
+            // or canonical document-type alias. The alias fallback makes Smart Upload
+            // rows (document_master_id = NULL, document_type = "PAN_CARD" etc.) fill
+            // the correct legacy slot even when the Dataverse description differs in
+            // spelling ("PAN Card" vs "PAN_CARD", "Aadhaar Card" vs "AADHAR_CARD").
+            final String descCanonical = canonicalDocType(description);
             KycDocuments uploaded = uploadedDocs.stream()
                     .filter(doc -> {
                         if (description != null && description.equalsIgnoreCase(doc.getDocumentType())) {
                             return true;
                         }
                         if (dynamicsId != null && dynamicsId.equals(doc.getDocumentMasterId())) {
+                            return true;
+                        }
+                        if (descCanonical != null
+                                && descCanonical.equals(canonicalDocType(doc.getDocumentType()))) {
                             return true;
                         }
                         return false;
@@ -855,6 +864,26 @@ public class InvestorDocumentService {
     /**
      * Extract file name from document URL
      */
+    /**
+     * Maps assorted spellings of a KYC document type to a canonical code so
+     * Smart Upload rows align with Dataverse-driven slots.
+     * e.g. "PAN Card", "PAN_CARD", "PAN" -> "PAN"
+     *      "Aadhaar Card", "AADHAR_CARD", "AADHAR" -> "AADHAAR"
+     */
+    private String canonicalDocType(String raw) {
+        if (raw == null) return null;
+        String n = raw.toUpperCase(java.util.Locale.ROOT).replaceAll("[^A-Z]", "");
+        if (n.isEmpty()) return null;
+        if (n.contains("PAN")) return "PAN";
+        if (n.contains("PASSPORT")) return "PASSPORT";
+        if (n.contains("AADHA") || n.contains("ADHAAR") || n.contains("ADHAR")) return "AADHAAR";
+        if (n.contains("OCI")) return "OCI";
+        if (n.contains("ADDRESS")) return "ADDRESS";
+        if (n.contains("BANK")) return "BANK";
+        if (n.contains("VISA")) return "VISA";
+        return null;
+    }
+
     private String extractFileName(String documentUrl) {
         if (documentUrl == null || documentUrl.isEmpty()) {
             return "Unknown";

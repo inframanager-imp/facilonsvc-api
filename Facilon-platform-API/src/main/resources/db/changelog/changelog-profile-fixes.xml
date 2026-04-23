@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!--
+        Missing columns / mapping gaps in the investor profile round-trip.
+        Frontend posts values but they were silently dropped because the
+        corresponding column did not exist or was not mapped.
+    -->
+
+    <changeSet id="profile-fix-1" author="facilon">
+        <sql>
+            ALTER TABLE investor_nomination ADD COLUMN nominee_country VARCHAR(100) NULL
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
