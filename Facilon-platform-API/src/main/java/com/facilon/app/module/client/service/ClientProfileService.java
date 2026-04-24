@@ -232,7 +232,6 @@ public class ClientProfileService {
      * Update personal information. Creates or updates the record.
      */
     public UserPersonalInformationDto updatePersonalInfo(Long userId, UserPersonalInformationDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -503,7 +502,6 @@ public class ClientProfileService {
      * Update passport details. Creates or updates the record.
      */
     public UserPassportDetailsDto updatePassport(Long userId, UserPassportDetailsDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -577,7 +575,6 @@ public class ClientProfileService {
      * Update investor experience. Creates or updates the record.
      */
     public InvestorExperienceDto updateExperience(Long userId, InvestorExperienceDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -888,7 +885,6 @@ public class ClientProfileService {
     }
 
     public UserResidentialStatusDto updateResidentialStatus(Long userId, UserResidentialStatusDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -971,7 +967,6 @@ public class ClientProfileService {
     }
 
     public UserTaxInfoDto updateTaxInfo(Long userId, UserTaxInfoDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1040,7 +1035,6 @@ public class ClientProfileService {
     }
 
     public UserBankDetailsDto updateBankDetails(Long userId, UserBankDetailsDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1198,7 +1192,6 @@ public class ClientProfileService {
     }
 
     public UserContactDetailsDto updateContactDetails(Long userId, UserContactDetailsDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1259,7 +1252,6 @@ public class ClientProfileService {
     }
 
     public UserNominationDto updateNomination(Long userId, UserNominationDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1382,7 +1374,6 @@ public class ClientProfileService {
     }
 
     public UserRiskProfileDto updateRiskProfile(Long userId, UserRiskProfileDto dto) {
-        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
