@@ -21,6 +21,8 @@ public class UserResidentialStatusDto {
     private String aadharNumberOption;    // yes/no
     private String aadharNumber;
     private String userAadharNo;
+    /** Name as printed on the Aadhaar card (RI flow only). */
+    private String nameOnAadhaar;
     private String ociAvailable;          // yes/no
     private String dateOfOci;
     private String addressProofType;

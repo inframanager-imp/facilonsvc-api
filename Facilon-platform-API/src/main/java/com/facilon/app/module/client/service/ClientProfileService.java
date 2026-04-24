@@ -232,6 +232,7 @@ public class ClientProfileService {
      * Update personal information. Creates or updates the record.
      */
     public UserPersonalInformationDto updatePersonalInfo(Long userId, UserPersonalInformationDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -353,6 +354,18 @@ public class ClientProfileService {
             info.setProofOfAddress(dto.getProofOfAddress());
         if (dto.getAddressType() != null)
             info.setAddressType(dto.getAddressType());
+
+        // RI force-stamps: the profile UI hides Citizenship and Country of
+        // Residence for RESIDENT_INDIVIDUAL. Default them to India on save so
+        // the row is never persisted with blanks for those required fields.
+        if (isResidentIndividual(investor)) {
+            if (info.getCitizenship() == null || info.getCitizenship().isBlank()) {
+                info.setCitizenship("India");
+            }
+            if (info.getCountryOfResidence() == null || info.getCountryOfResidence().isBlank()) {
+                info.setCountryOfResidence("India");
+            }
+        }
 
         info.setTenant(tenant);
         info = personalInfoRepository.save(info);
@@ -490,6 +503,7 @@ public class ClientProfileService {
      * Update passport details. Creates or updates the record.
      */
     public UserPassportDetailsDto updatePassport(Long userId, UserPassportDetailsDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -563,6 +577,7 @@ public class ClientProfileService {
      * Update investor experience. Creates or updates the record.
      */
     public InvestorExperienceDto updateExperience(Long userId, InvestorExperienceDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -873,6 +888,7 @@ public class ClientProfileService {
     }
 
     public UserResidentialStatusDto updateResidentialStatus(Long userId, UserResidentialStatusDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -911,8 +927,17 @@ public class ClientProfileService {
         status.setAadharNumberOption(dto.getAadharNumberOption());
         status.setAadharNumber(dto.getAadharNumber());
         status.setUserAadharNo(dto.getUserAadharNo());
+        status.setNameOnAadhaar(dto.getNameOnAadhaar());
         status.setOciAvailable(dto.getOciAvailable());
         status.setDateOfOci(dto.getDateOfOci() != null && !dto.getDateOfOci().isBlank() ? java.time.LocalDate.parse(dto.getDateOfOci()) : null);
+
+        // RI force-stamp: the UI hides the Residential Status dropdown and
+        // the tab is relabelled "Aadhaar Details". Stamp "Resident Indian"
+        // so the row has a definite value on save.
+        if (isResidentIndividual(investor)) {
+            status.setResidentialStatus("Resident Indian");
+        }
+
         status.setTenant(tenant);
         status = residentialStatusRepository.save(status);
 
@@ -946,6 +971,7 @@ public class ClientProfileService {
     }
 
     public UserTaxInfoDto updateTaxInfo(Long userId, UserTaxInfoDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1014,6 +1040,7 @@ public class ClientProfileService {
     }
 
     public UserBankDetailsDto updateBankDetails(Long userId, UserBankDetailsDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1047,6 +1074,30 @@ public class ClientProfileService {
         bank.setBankDetailsZipCode(dto.getBankDetailsZipCode());
         bank.setBankDetailsMicr(dto.getBankDetailsMicr());
         bank.setIsPrimary(Boolean.TRUE.equals(dto.getIsPrimaryAccount()) || Boolean.TRUE.equals(dto.getIsPrimary()));
+
+        // RI force-stamps: Country field is hidden in the UI (defaults to
+        // India); Beneficiary Name is pre-filled from the investor's registered
+        // name. Persist both server-side so the save payload cannot omit them.
+        if (isResidentIndividual(investor)) {
+            if (bank.getBankCountry() == null) {
+                bank.setBankCountry(1); // India — canonical id matched by isIndiaNationality
+            }
+            if (bank.getAccountHolderName() == null || bank.getAccountHolderName().isBlank()) {
+                String fallbackName = personalInfoRepository
+                        .findByInvestorUniqueId(investor.getUniqueCode())
+                        .map(info -> firstNonBlank(
+                                (info.getInvestorFirstName() == null ? "" : info.getInvestorFirstName())
+                                        + (info.getInvestorLastName() == null || info.getInvestorLastName().isBlank()
+                                                ? ""
+                                                : " " + info.getInvestorLastName()),
+                                null))
+                        .orElse(null);
+                if (fallbackName != null && !fallbackName.isBlank()) {
+                    bank.setAccountHolderName(fallbackName.trim());
+                }
+            }
+        }
+
         bank.setTenant(tenant);
         bank = bankDetailsRepository.save(bank);
 
@@ -1147,6 +1198,7 @@ public class ClientProfileService {
     }
 
     public UserContactDetailsDto updateContactDetails(Long userId, UserContactDetailsDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1207,6 +1259,7 @@ public class ClientProfileService {
     }
 
     public UserNominationDto updateNomination(Long userId, UserNominationDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1225,26 +1278,31 @@ public class ClientProfileService {
         List<InvestorNomination> nominationsToSave = new ArrayList<>();
 
         if (firstNonBlank(dto.getNomineeFirstName(), dto.getNomineeName1()) != null) {
+            // IMPORTANT: numbered fields (nomineeRelation1, nomineeDob1, etc.)
+            // are the authoritative ones the form's onChange handlers write to.
+            // The unnumbered equivalents are read-only mirrors populated by
+            // toNominationDto for legacy clients — prefer the numbered value so
+            // a stale mirror from the last GET never shadows a fresh selection.
             InvestorNomination nominee1 = InvestorNomination.builder()
                     .investorUniqueId(investor.getUniqueCode())
-                    .nomineeFirstName(firstNonBlank(dto.getNomineeFirstName(), dto.getNomineeName1()))
+                    .nomineeFirstName(firstNonBlank(dto.getNomineeName1(), dto.getNomineeFirstName()))
                     .nomineeMiddleName(dto.getNomineeMiddleName())
                     .nomineeLastName(dto.getNomineeLastName())
-                    .relationship(firstNonBlank(dto.getNomineeRelationship(), dto.getNomineeRelation1()))
-                    .dateOfBirth(parseDate(firstNonBlank(dto.getNomineeDob(), dto.getNomineeDob1())))
-                    .allocationPercentage(dto.getNomineeShare() != null ? dto.getNomineeShare() : dto.getNomineeShare1())
-                    .nomineeEmail(firstNonBlank(dto.getNomineeEmail(), dto.getNomineeEmail1()))
-                    .nomineeMobile(firstNonBlank(dto.getNomineeMobile(), dto.getNomineeMobile1()))
+                    .relationship(firstNonBlank(dto.getNomineeRelation1(), dto.getNomineeRelationship()))
+                    .dateOfBirth(parseDate(firstNonBlank(dto.getNomineeDob1(), dto.getNomineeDob())))
+                    .allocationPercentage(dto.getNomineeShare1() != null ? dto.getNomineeShare1() : dto.getNomineeShare())
+                    .nomineeEmail(firstNonBlank(dto.getNomineeEmail1(), dto.getNomineeEmail()))
+                    .nomineeMobile(firstNonBlank(dto.getNomineeMobile1(), dto.getNomineeMobile()))
                     .nomineeDocType(dto.getNomineeDocType1())
                     .nomineeDocNo(dto.getNomineeDocNo1())
                     .nomineeCountrycode(dto.getNomineeCountrycode1())
-                    .nomineeAddress(dto.getNomineeAddress())
-                    .nomineeCity(dto.getNomineeCity())
-                    .nomineeState(dto.getNomineeState())
-                    .nomineePostalCode(dto.getNomineePostalCode())
+                    .nomineeAddress(firstNonBlank(dto.getNomineeAddress1(), dto.getNomineeAddress()))
+                    .nomineeCity(firstNonBlank(dto.getNomineeCity1(), dto.getNomineeCity()))
+                    .nomineeState(firstNonBlank(dto.getNomineeState1(), dto.getNomineeState()))
+                    .nomineePostalCode(firstNonBlank(dto.getNomineePincode1(), dto.getNomineePostalCode()))
                     .nomineeCountry(dto.getNomineeCountry1())
                     .isMinor(dto.getIsMinor())
-                    .guardianName(firstNonBlank(dto.getGuardianName(), dto.getGuardianName1()))
+                    .guardianName(firstNonBlank(dto.getGuardianName1(), dto.getGuardianName()))
                     .guardianRelationship(dto.getGuardianRelationship())
                     .guardianDocType(dto.getGuardianDocType1())
                     .guardianDocNo(dto.getGuardianDocNo1())
@@ -1324,6 +1382,7 @@ public class ClientProfileService {
     }
 
     public UserRiskProfileDto updateRiskProfile(Long userId, UserRiskProfileDto dto) {
+        KycInputNormalizer.uppercaseInPlace(dto);
         Investor investor = getInvestorForUser(userId);
         var tenant = TenantContextHolder.getContext().getTenant();
 
@@ -1407,6 +1466,7 @@ public class ClientProfileService {
                 .aadharNumberOption(s.getAadharNumberOption())
                 .aadharNumber(s.getAadharNumber())
                 .userAadharNo(s.getUserAadharNo())
+                .nameOnAadhaar(s.getNameOnAadhaar())
                 .ociAvailable(s.getOciAvailable())
                 .dateOfOci(s.getDateOfOci() != null ? s.getDateOfOci().toString() : null)
                 .build();
@@ -1652,6 +1712,14 @@ public class ClientProfileService {
             return primary;
         }
         return (fallback != null && !fallback.isBlank()) ? fallback : null;
+    }
+
+    /** Is this investor a Resident Indian Individual? Drives the force-stamp
+     *  defaults below — the profile UI hides the matching inputs so the
+     *  backend fills them in on save. */
+    private boolean isResidentIndividual(Investor investor) {
+        return investor != null
+                && "RESIDENT_INDIVIDUAL".equalsIgnoreCase(investor.getInvestorType());
     }
 
     private List<String> splitCsv(String csv) {

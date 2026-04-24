@@ -113,6 +113,10 @@ public class InvestorResidentialStatus extends TenantEntity {
     @Column(name = "user_aadhar_no", columnDefinition = "TEXT")
     private String userAadharNo;
 
+    /** Name as printed on the Aadhaar card (RI-flow Aadhaar Details tab). */
+    @Column(name = "name_on_aadhaar", columnDefinition = "TEXT")
+    private String nameOnAadhaar;
+
     @Column(name = "oci_available", columnDefinition = "TEXT")
     private String ociAvailable;
 

@@ -39,6 +39,7 @@ public class KycProfileImportService {
     private final InvestorContactDetailsRepository contactDetailsRepository;
     private final InvestorBankDetailsRepository bankDetailsRepository;
     private final UserPassportDetailsRepository passportDetailsRepository;
+    private final InvestorResidentialStatusRepository residentialStatusRepository;
 
     public record ImportResult(int imported, List<ImportConflict> conflicts) {}
 
@@ -70,6 +71,7 @@ public class KycProfileImportService {
         imported += applyToBankDetails(doc, f, disputed, conflicts);
         imported += applyToPassportDetails(doc, f, disputed, conflicts);
         imported += applyToOciInfo(doc, f, disputed, conflicts);
+        imported += applyToResidentialStatus(doc, f, disputed, conflicts);
         log.info("KYC import: doc={} type={} fields_imported={} conflicts={}",
                 doc.getId(), doc.getDocumentType(), imported, conflicts.size());
         return new ImportResult(imported, conflicts);
@@ -630,6 +632,90 @@ public class KycProfileImportService {
                 changes++;
             }
             personalInfoRepository.save(info);
+        }
+        return changes;
+    }
+
+    /**
+     * Populate the Aadhaar fields on investor_residential_status from an
+     * AADHAR_CARD OCR so the RI Aadhaar Details tab is pre-filled after
+     * confirm. Writes Aadhaar number (duplicated across aadhar_number and
+     * user_aadhar_no to match the V10 parity columns) plus the printed
+     * "Name on Aadhaar". Residential-status enum field is only touched
+     * when the investor is RI and the column is blank — never overwrites
+     * an explicit NRI / OCI / Foreign-National selection.
+     */
+    private int applyToResidentialStatus(KycDocuments doc, Map<String, String> f,
+                                         Set<String> disputed, List<ImportConflict> conflicts) {
+        if (!"AADHAR_CARD".equals(doc.getDocumentType())) return 0;
+
+        String aadhaar = trimOrNull(firstNonBlank(
+                f.get("aadhaar_number"), f.get("aadhar_number"), f.get("document_number")));
+        String nameOnAadhaar = trimOrNull(firstNonBlank(
+                f.get("name_on_aadhaar"), f.get("full_name"), f.get("name")));
+        if (nameOnAadhaar == null) {
+            // Reconstruct from split pieces when full_name wasn't emitted.
+            String first = trimOrNull(firstNonBlank(f.get("first_name"), f.get("given_name")));
+            String middle = trimOrNull(f.get("middle_name"));
+            String last = trimOrNull(firstNonBlank(f.get("last_name"), f.get("surname")));
+            StringBuilder sb = new StringBuilder();
+            if (first != null) sb.append(first);
+            if (middle != null) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(middle);
+            }
+            if (last != null) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(last);
+            }
+            if (sb.length() > 0) nameOnAadhaar = sb.toString();
+        }
+
+        boolean anyField = aadhaar != null || nameOnAadhaar != null;
+        if (!anyField) return 0;
+
+        InvestorResidentialStatus status = residentialStatusRepository
+                .findByInvestorUniqueId(doc.getInvestorUniqueId())
+                .orElseGet(() -> InvestorResidentialStatus.builder()
+                        .investorUniqueId(doc.getInvestorUniqueId())
+                        .build());
+
+        log.info("KYC import: doc={} applying Aadhaar details to investor_residential_status", doc.getId());
+
+        int changes = 0;
+        if (!disputed.contains("aadhaar_number") && !disputed.contains("aadhar_number")) {
+            changes += tryImport(doc, "investor_residential_status.aadhar_number",
+                    status.getAadharNumber(), aadhaar,
+                    status::setAadharNumber, conflicts, KycProfileImportService::equivalentCaseInsensitive);
+            changes += tryImport(doc, "investor_residential_status.user_aadhar_no",
+                    status.getUserAadharNo(), aadhaar,
+                    status::setUserAadharNo, conflicts, KycProfileImportService::equivalentCaseInsensitive);
+        }
+        if (!disputed.contains("full_name") && !disputed.contains("name")) {
+            changes += tryImport(doc, "investor_residential_status.name_on_aadhaar",
+                    status.getNameOnAadhaar(), nameOnAadhaar,
+                    status::setNameOnAadhaar, conflicts, KycNameNormalizer::equivalent);
+        }
+        if (changes > 0) {
+            // Flip "Do you have Aadhaar?" to yes if still blank, since we
+            // just imported Aadhaar data. Never flip an explicit No.
+            if (status.getAadharNumberOption() == null || status.getAadharNumberOption().isBlank()) {
+                audit(doc, "investor_residential_status.aadhar_number_option", null, "yes");
+                status.setAadharNumberOption("yes");
+                changes++;
+            }
+            // For RI, stamp residential_status = "Resident Indian" when blank
+            // so the RI Aadhaar Details tab saves with the correct value on
+            // the first Aadhaar confirmation — mirrors the force-stamp in
+            // ClientProfileService.updateResidentialStatus.
+            Investor investor = investorRepository.findByUniqueCode(doc.getInvestorUniqueId()).orElse(null);
+            if (investor != null && "RESIDENT_INDIVIDUAL".equalsIgnoreCase(investor.getInvestorType())
+                    && (status.getResidentialStatus() == null || status.getResidentialStatus().isBlank())) {
+                audit(doc, "investor_residential_status.residential_status", null, "Resident Indian");
+                status.setResidentialStatus("Resident Indian");
+                changes++;
+            }
+            residentialStatusRepository.save(status);
         }
         return changes;
     }
