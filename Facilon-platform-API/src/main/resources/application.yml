@@ -1,6 +1,10 @@
 spring:
   profiles:
     active: dev
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 # JAVAPDFill service — fills the blank Ventura NRI AcroForm PDF with investor data.
 # Deployed separately (see d:/sam/facilon-git_bub/JAVAPDFill); Facilon calls it over HTTP.
@@ -25,3 +29,27 @@ fillpdf:
     engine: ${KYC_PDF_ENGINE:fillapi}
     # Classpath path to the blank fillable NRI booklet (loaded by KycPdfService.generateKycPdfViaFillApi).
     nri-template: templates/pdf/kyc-form/nri/Ventura_Account_opening_NRI.pdf
+
+# Smart Upload OCR - integrates with the ORCReader microservice (plan §3.5).
+# ORCReader must be running as a separate process; default http://localhost:8080.
+ai:
+  ocr:
+    base-url: ${OCR_BASE_URL:http://localhost:8080}
+    endpoint: /api/kyc/extract
+    provider: ${OCR_PROVIDER:mistral}
+    timeout-seconds: 60
+    apply-ocr: true
+
+# KYC expiry monitoring (plan §3.7).
+kyc:
+  expiry:
+    cron: "0 0 2 * * *"
+    cron-enabled: true
+    warn-window-days: 30
+    notify-interval-days: 7
+  # Derived validity for address proofs that have no native expiry field.
+  # A utility bill or bank statement is valid as address proof for 90 days from issue;
+  # a rent agreement without an OCR-detected end date defaults to ~11 months.
+  address-proof:
+    recent-doc-validity-days: 90
+    rent-agreement-validity-days: 335
