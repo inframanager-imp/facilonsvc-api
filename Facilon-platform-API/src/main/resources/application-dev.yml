@@ -119,6 +119,12 @@ dataverse:
     parent-location-id: "112fd6a2-12f1-f011-8406-7ced8d285638"
     site-collection-id: "43de59de-265e-f011-877b-7c1e5232a375"
 
+# Microsoft Graph B2B guest invitation (Laravel: BrokerController::service_provider_user_register_store §B2B)
+# Uses tenant_dynamics_config credentials; the workforce app reg needs User.Invite.All granted.
+b2b:
+  invite:
+    redirect-url: ${B2B_INVITE_REDIRECT_URL:https://fportalonboard.powerappsportals.com}
+
 investor:
   onboarding:
     default-tenant-id: 1

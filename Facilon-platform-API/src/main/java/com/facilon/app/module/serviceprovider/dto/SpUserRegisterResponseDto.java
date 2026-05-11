@@ -13,6 +13,8 @@ public class SpUserRegisterResponseDto {
     private boolean success;
     private String message;
     private boolean welcomeMailSent;
-    /** Set true once Slice C wires Graph /invitations; today always false. */
+    /** True when the Graph /invitations call returned 2xx. */
     private boolean b2bInviteSent;
+    /** Azure AD object id of the invited B2B guest, populated when {@link #b2bInviteSent} is true. */
+    private String invitedUserId;
 }

@@ -1,5 +1,6 @@
 package com.facilon.app.module.serviceprovider.service;
 
+import com.facilon.app.integration.b2b.B2bInviteService;
 import com.facilon.app.integration.graphemail.GraphEmailService;
 import com.facilon.app.module.client.model.PowerAppContacts;
 import com.facilon.app.module.client.repository.PowerAppContactsRepository;
@@ -68,6 +69,7 @@ public class SpRegistrationService {
     private final PdfGeneratorService pdfGeneratorService;
     /** Optional so the API still boots when graph.email.enabled=false in some envs. */
     private final ObjectProvider<GraphEmailService> graphEmailServiceProvider;
+    private final B2bInviteService b2bInviteService;
 
     // ─── Step 1 — landing ───────────────────────────────────────────────────────
 
@@ -200,16 +202,27 @@ public class SpRegistrationService {
             log.error("SP welcome mail failed for {}: {}", dto.getOfficialEmail(), e.getMessage(), e);
         }
 
-        // TODO: Slice C — call Microsoft Graph POST /v1.0/invitations using the
-        // workforce-tenant credentials in tenant_graph_email_config. Deferred per stakeholder
-        // direction (B2B vs B2C decision still open — see SP_REGISTRATION_PORT_PLAN.md §5).
-        log.info("SP user {} registered (id={}); B2B /invitations call deferred", saved.getOfficialEmail(), saved.getId());
+        // Mirrors Laravel BrokerController::service_provider_user_register_store §B2B
+        // (sends Graph POST /invitations using workforce-tenant Dynamics credentials).
+        String displayName = (dto.getFirstName() + " " + dto.getLastName()).trim();
+        B2bInviteService.InvitationResult inviteResult =
+                b2bInviteService.sendInvitation(dto.getOfficialEmail(), displayName);
+        if (inviteResult.success()) {
+            log.info("SP user {} registered (id={}); B2B invite sent (invitedUserId={})",
+                    saved.getOfficialEmail(), saved.getId(), inviteResult.invitedUserId());
+        } else {
+            log.warn("SP user {} registered (id={}) but B2B invite failed: {}",
+                    saved.getOfficialEmail(), saved.getId(), inviteResult.errorMessage());
+        }
 
         return SpUserRegisterResponseDto.builder()
                 .success(true)
-                .message("Registration submitted successfully.")
+                .message(inviteResult.success()
+                        ? "Registration submitted successfully. Check your inbox for the Microsoft B2B invitation."
+                        : "Registration submitted successfully. (B2B invitation will be retried by support.)")
                 .welcomeMailSent(welcomeMailed)
-                .b2bInviteSent(false)
+                .b2bInviteSent(inviteResult.success())
+                .invitedUserId(inviteResult.invitedUserId())
                 .build();
     }
 
