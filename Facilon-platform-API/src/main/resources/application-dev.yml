@@ -72,7 +72,7 @@ logging:
 integration:
   user-mgmt:
     enabled: true
-    url: ${USER_MGMT_SERVICE_URL:http://localhost:9090}
+    url: ${USER_MGMT_SERVICE_URL:http://localhost:8081}
   email:
     enabled: false
     url: ${EMAIL_SERVICE_URL:http://localhost:8080}
@@ -88,6 +88,16 @@ graph:
     enabled: true
 
 dataverse:
+  # Service Provider invite-link sync (mirrors Laravel `powerapp:sync-contacts`).
+  # In dev the link must point at the locally-running facilonsvc-web (CRA default :3000)
+  # so the invite email opens the React app, not the demo Laravel host.
+  powerapp-sync:
+    # Matches Laravel ->everyMinute() in Investor/app/Console/Kernel.php
+    cron: "0 * * * * *"
+    cron-enabled: true
+    top: 1
+    registration-base-url: http://${client.host}:3000/account/investor/step
+    email-subject: "Complete Your User Registration with Facilon Services"
   master-sync:
     # Run on startup: true = sync all master tables when the server boots
     run-on-startup: false
@@ -147,6 +157,7 @@ ignored:
     - /api/auth/azure-b2c/**
     - /api/graph-email/**
     - /api/clients/documents/submission/**
+    - /api/clients/sp/**
 
 # SharePoint Document URLs
 sharepoint:

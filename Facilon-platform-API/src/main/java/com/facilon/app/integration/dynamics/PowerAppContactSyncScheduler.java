@@ -14,15 +14,17 @@ import java.util.Map;
  * Cron-driven wrapper around {@link PowerAppContactSyncService}.
  *
  * <p>Direct mirror of Laravel's {@code powerapp:sync-contacts} Artisan command
- * which runs on the Laravel scheduler.  Default cadence is every 10 minutes —
- * low enough latency for service-provider onboarding while avoiding Dataverse
- * throttling.
+ * which runs on the Laravel scheduler. Cadence matches Laravel's
+ * {@code ->everyMinute()} schedule (see Investor/app/Console/Kernel.php) —
+ * polled once a minute. Spring's default scheduler is single-threaded, so
+ * a slow run will skip the next firing rather than overlap, which matches
+ * Laravel's {@code ->withoutOverlapping()}.
  *
  * <h3>Configuration (application-*.yml)</h3>
  * <pre>
  * dataverse:
  *   powerapp-sync:
- *     cron: "0 *&#47;10 * * * *"    # every 10 minutes (default)
+ *     cron: "0 * * * * *"       # every minute (matches Laravel ->everyMinute())
  *     cron-enabled: true
  * </pre>
  */
@@ -38,7 +40,7 @@ public class PowerAppContactSyncScheduler {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    @Scheduled(cron = "${dataverse.powerapp-sync.cron:0 */10 * * * *}")
+    @Scheduled(cron = "${dataverse.powerapp-sync.cron:0 * * * * *}")
     public void scheduledSync() {
         if (!cronEnabled) {
             log.debug("[PowerAppSync] Cron skipped (cron-enabled=false)");

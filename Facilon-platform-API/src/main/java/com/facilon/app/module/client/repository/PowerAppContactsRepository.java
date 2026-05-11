@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -33,6 +34,16 @@ public interface PowerAppContactsRepository extends JpaRepository<PowerAppContac
     Optional<PowerAppContacts> findByPowerAppContactId(String powerAppContactId);
 
     /**
+     * Lookup used by the Service Provider onboarding flow — the SP-onboarding token
+     * (Laravel `Crypt::encrypt(email)`) decrypts to the email, which is then used to
+     * load the matching contact. Mirrors Laravel:
+     * <pre>
+     *   DB::table('powerapp_contacts')-&gt;where('email', $email)-&gt;latest('id')-&gt;first();
+     * </pre>
+     */
+    Optional<PowerAppContacts> findFirstByEmailIgnoreCaseOrderByIdDesc(String email);
+
+    /**
      * Update the {@code b2c_status} (and optional {@code error_message}) after the
      * onboarding email send completes. Matches Laravel's:
      * <pre>
@@ -42,6 +53,7 @@ public interface PowerAppContactsRepository extends JpaRepository<PowerAppContac
      * </pre>
      */
     @Modifying
+    @Transactional
     @Query("UPDATE PowerAppContacts p SET p.b2cStatus = :status, p.errorMessage = :errorMessage "
             + "WHERE p.powerAppContactId = :contactId")
     int updateB2cStatus(@Param("contactId") String contactId,

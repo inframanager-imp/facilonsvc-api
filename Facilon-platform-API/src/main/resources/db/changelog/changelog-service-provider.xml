@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- Mirrors Laravel `sp_consents_user` (BrokerController::service_provider_step3_submit) -->
+    <changeSet id="sp-consents-user-1" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS sp_consents_user (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NULL,
+                unique_code VARCHAR(255) NOT NULL,
+                consent_version VARCHAR(32) NOT NULL,
+                effective_date DATE NOT NULL,
+                ip_address VARCHAR(64),
+                user_agent VARCHAR(512),
+                escalation_name VARCHAR(255),
+                escalation_email VARCHAR(255),
+                escalation_phone VARCHAR(64),
+                consent_given TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_sp_consents_user_unique_code (unique_code),
+                INDEX idx_sp_consents_user_tenant (tenant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS sp_consents_user;
+        </rollback>
+    </changeSet>
+
+    <!-- Mirrors Laravel `service_provider_users` (BrokerController::service_provider_user_register_store) -->
+    <changeSet id="service-provider-users-1" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS service_provider_users (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                tenant_id BIGINT NULL,
+                service_provider_name VARCHAR(255) NOT NULL,
+                first_name VARCHAR(255) NOT NULL,
+                last_name VARCHAR(255) NOT NULL,
+                designation VARCHAR(255),
+                official_email VARCHAR(255) NOT NULL,
+                official_phone VARCHAR(32) NOT NULL,
+                consent TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT uk_service_provider_users_official_email UNIQUE (official_email),
+                INDEX idx_service_provider_users_tenant (tenant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        </sql>
+        <rollback>
+            DROP TABLE IF EXISTS service_provider_users;
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

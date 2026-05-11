@@ -22,7 +22,7 @@ public class DocumentNotificationService {
     private final EmailService emailService;
     private final EmailTemplateLoader templateLoader;
     
-    @Value("${app.base-url:http://localhost:3000}")
+    @Value("${app.client_url:http://localhost:3000}")
     private String baseUrl;
     
     @Value("${app.support-email:support@facilon.com}")

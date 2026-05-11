@@ -7,14 +7,12 @@ eureka:
     preferIpAddress: true
 server:
   port: ${SERVICE_1_PORT}
-  servlet:
-    context-path: /usr-mgmt
 spring:
   application:
     name: ${SERVICE_1_NAME}
 azure:
   issuerName: ${AZURE_AD_ISSUER_NAME}
-  forceResetPassword: ${AZURE_FORCE_RESET_PASSWORD}
+  forceResetPassword: ${AZURE_FORCE_RESET_PASSWORD:false}
 
 servicename: user-management-service
 logging:

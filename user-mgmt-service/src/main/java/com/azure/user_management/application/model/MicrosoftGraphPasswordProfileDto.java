@@ -14,7 +14,6 @@ public class MicrosoftGraphPasswordProfileDto {
     private Boolean forceChangePasswordNextSignIn;
 
     public void setForceChangePasswordNextSignIn(Boolean forceChangePasswordNextSignIn) {
-        if(forceChangePasswordNextSignIn==null) this.forceChangePasswordNextSignIn=Boolean.FALSE;
-        this.forceChangePasswordNextSignIn = forceChangePasswordNextSignIn;
+        this.forceChangePasswordNextSignIn = forceChangePasswordNextSignIn == null ? Boolean.FALSE : forceChangePasswordNextSignIn;
     }
 }

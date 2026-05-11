@@ -348,6 +348,18 @@ public class AzureADUserController {
             }
             MicrosoftGraphResponseDto microsoftGraphResponseDto = gson.fromJson(response,
                     MicrosoftGraphResponseDto.class);
+            // Graph error responses parse into a DTO with id=null. Surface the Graph error so
+            // upstream callers don't think creation succeeded.
+            if (microsoftGraphResponseDto == null
+                    || microsoftGraphResponseDto.getId() == null
+                    || microsoftGraphResponseDto.getId().isBlank()) {
+                MicrosoftGraphResponseDto err = microsoftGraphResponseDto != null
+                        ? microsoftGraphResponseDto
+                        : new MicrosoftGraphResponseDto();
+                err.setErrorMsg(extractGraphErrorMessage(response));
+                log.warn("Graph create-user returned no id. Body: {}", response);
+                return err;
+            }
             String authURL = "https://graph.microsoft.com/v1.0/users/" + microsoftGraphResponseDto.getId()
                     + "/authentication/phoneMethods";
             UserAuthenticationMobile userAuthenticationMobile = new UserAuthenticationMobile();
@@ -373,6 +385,21 @@ public class AzureADUserController {
             e.printStackTrace();
             return null;
         }
+    }
+
+    private String extractGraphErrorMessage(String body) {
+        if (body == null || body.isBlank()) return "Azure AD user creation failed (empty response)";
+        try {
+            JsonObject root = JsonParser.parseString(body).getAsJsonObject();
+            if (root.has("error")) {
+                JsonObject err = root.getAsJsonObject("error");
+                String code = err.has("code") ? err.get("code").getAsString() : "";
+                String msg = err.has("message") ? err.get("message").getAsString() : "";
+                return (code.isEmpty() ? "" : code + ": ") + (msg.isEmpty() ? body : msg);
+            }
+        } catch (Exception ignored) {
+        }
+        return "Azure AD user creation failed: " + body;
     }
 
     private String postServiceCall(String url, okhttp3.RequestBody requestBody, String accessToken) throws Exception {

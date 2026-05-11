@@ -148,9 +148,56 @@ public class GraphEmailService {
     }
 
     /**
+     * Send email with a single in-memory PDF attachment. Mirrors Laravel's
+     * {@code base64_encode($pdf->output())} → Graph fileAttachment pattern used by
+     * {@code BrokerController::store_sp_consent} / {@code service_provider_step3_submit}.
+     */
+    public boolean sendEmailWithPdfBytes(String toEmail, String subject, String htmlContent,
+                                         String pdfFilename, byte[] pdfBytes) {
+        try {
+            TenantGraphEmailConfig cfg = configService.getConfigForCurrentTenantOrDefault();
+            String senderEmail = cfg != null && cfg.getSenderEmail() != null ? cfg.getSenderEmail() : "noreply@facilon.com";
+            String token = tokenProvider.getGraphToken();
+            String url = GRAPH_BASE + "/users/" + senderEmail + "/sendMail";
+
+            Map<String, Object> emailPayload = buildEmailPayload(toEmail, subject, htmlContent, null, null, null);
+
+            if (pdfBytes != null && pdfBytes.length > 0) {
+                Map<String, Object> attachment = new HashMap<>();
+                attachment.put("@odata.type", "#microsoft.graph.fileAttachment");
+                attachment.put("name", pdfFilename != null ? pdfFilename : "document.pdf");
+                attachment.put("contentType", "application/pdf");
+                attachment.put("contentBytes", Base64.getEncoder().encodeToString(pdfBytes));
+                List<Map<String, Object>> attachmentsList = new ArrayList<>();
+                attachmentsList.add(attachment);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> message = (Map<String, Object>) emailPayload.get("message");
+                message.put("attachments", attachmentsList);
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(emailPayload, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("Email with PDF sent successfully via Graph API to: {}", toEmail);
+                return true;
+            }
+            log.error("Failed to send email with PDF. Status: {}", response.getStatusCode());
+            return false;
+        } catch (Exception e) {
+            log.error("Error sending email with PDF: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /**
      * Send email with attachments (Graph API supports this)
      */
-    public boolean sendEmailWithAttachments(String toEmail, String subject, String htmlContent, 
+    public boolean sendEmailWithAttachments(String toEmail, String subject, String htmlContent,
                                            List<MultipartFile> attachments) {
         try {
             TenantGraphEmailConfig cfg = configService.getConfigForCurrentTenantOrDefault();

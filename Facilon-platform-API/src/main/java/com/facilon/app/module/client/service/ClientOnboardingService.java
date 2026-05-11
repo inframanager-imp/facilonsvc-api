@@ -72,7 +72,7 @@ public class ClientOnboardingService {
     @Value("${investor.onboarding.india-isd-code:91}")
     private String indiaIsdCode;
 
-    @Value("${app.base-url:http://localhost:3000}")
+    @Value("${app.client_url:http://localhost:3000}")
     private String baseUrl;
 
     private static final Random RANDOM = new Random();

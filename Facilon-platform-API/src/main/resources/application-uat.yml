@@ -85,6 +85,53 @@ graph:
     sender-email: ${GRAPH_EMAIL_SENDER:no-reply@facilonservices.com}
     sender-name: Facilon Platform
 
+integration:
+  user-mgmt:
+    enabled: true
+    url: ${USER_MGMT_SERVICE_URL}
+  email:
+    enabled: false
+    url: ${EMAIL_SERVICE_URL:}
+  sms:
+    enabled: false
+    url: ${SMS_API_URL:}
+    auth-header: ${SMS_AUTH_HEADER:}
+    sender-id: ${SMS_SENDER_ID:FACILN}
+
+dataverse:
+  powerapp-sync:
+    cron: "0 * * * * *"
+    cron-enabled: true
+    top: 1
+    registration-base-url: ${POWERAPP_REGISTRATION_BASE_URL}
+    email-subject: "Complete Your User Registration with Facilon Services"
+  master-sync:
+    run-on-startup: false
+    cron: "0 0 2 * * *"
+    cron-enabled: true
+  document-status-sync:
+    cron: "0 */15 * * * *"
+    cron-enabled: true
+  sharepoint:
+    parent-location-id: ${DATAVERSE_SHAREPOINT_PARENT_LOCATION_ID:112fd6a2-12f1-f011-8406-7ced8d285638}
+    site-collection-id: ${DATAVERSE_SHAREPOINT_SITE_COLLECTION_ID:43de59de-265e-f011-877b-7c1e5232a375}
+
+investor:
+  onboarding:
+    default-tenant-id: ${INVESTOR_DEFAULT_TENANT_ID:1}
+    india-country-code: 240
+    india-isd-code: 91
+    batch-default-password: ${INVESTOR_BATCH_DEFAULT_PASSWORD}
+  introduced:
+    laravel-app-key: ${LARAVEL_APP_KEY}
+    laravel-cipher: aes-256-cbc
+  kyc:
+    upload-dir: ${KYC_UPLOAD_DIR:uploads/kyc}
+
+sharepoint:
+  investor-documents:
+    base-url: ${SHAREPOINT_INVESTOR_DOCS_BASE_URL:https://facilon.sharepoint.com/sites/CRM/ss_investordocuments}
+
 ignored:
   httpUrl:
     - /api/login
@@ -98,6 +145,15 @@ ignored:
     - /api/users/checkEmail
     - /api/admin/register
     - /api/clients/onboarding/**
+    - /api/clients/sp/**
     - /api/investor/introduced/**
     - /api/admin/tenants/*/admin-user
     - /api/admin/users/*/roles/*
+    - /api/azure-ad/create-user-latest
+    - /api/azure-ad/log-password-failure-count
+    - /api/clients/content/**
+    - /api/clients/introduced-investor/nextholder/docs/**
+    - /api/clients/pms-investor/nextholder/docs/**
+    - /api/auth/azure-b2c/**
+    - /api/graph-email/**
+    - /api/clients/documents/submission/**

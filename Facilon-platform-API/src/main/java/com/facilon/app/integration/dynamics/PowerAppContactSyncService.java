@@ -3,6 +3,8 @@ package com.facilon.app.integration.dynamics;
 import com.facilon.app.integration.graphemail.GraphEmailService;
 import com.facilon.app.module.client.model.PowerAppContacts;
 import com.facilon.app.module.client.repository.PowerAppContactsRepository;
+import com.facilon.app.util.EmailTemplateLoader;
+import com.facilon.app.util.LaravelEncryptionUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -67,6 +69,7 @@ public class PowerAppContactSyncService {
     private final PowerAppContactsRepository contactsRepository;
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectProvider<GraphEmailService> graphEmailServiceProvider;
+    private final EmailTemplateLoader emailTemplateLoader;
 
     @Value("${dataverse.powerapp-sync.top:1}")
     private int topPerRun;
@@ -270,17 +273,15 @@ public class PowerAppContactSyncService {
             return false;
         }
         try {
-            // Laravel encrypts the email and puts it in a ?status= query param on the registration URL
-            // (L219–L223).  Java uses Base64-URL as a lightweight functional equivalent — the real
-            // on-the-wire format of the status token is a server-side concern and the receiving
-            // endpoint will be the Java counterpart, so the opaque token just needs to round-trip.
-            String emailToken = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(email.getBytes(StandardCharsets.UTF_8));
+            // Laravel mints `?status=` with `Crypt::encrypt($email)`. We use the same
+            // wire format so the Spring SP-onboarding endpoints (LaravelEncryptionUtil.decrypt)
+            // accept tokens originally minted by Laravel during the cutover, and vice-versa.
+            String emailToken = LaravelEncryptionUtil.encrypt(email);
             String registrationUrl = registrationBaseUrl + "?status="
                     + URLEncoder.encode(emailToken, StandardCharsets.UTF_8);
 
             String name = trimToNull((nullSafe(firstName) + " " + nullSafe(lastName)).trim());
-            String htmlBody = buildOnboardingEmailBody(name, email, registrationUrl);
+            String htmlBody = renderInviteEmail(name, registrationUrl);
 
             boolean sent = mailer.sendEmail(email, emailSubject, htmlBody, firstName, lastName);
             String status = sent ? "MAIL_SENT" : "MAIL_FAILED";
@@ -296,22 +297,14 @@ public class PowerAppContactSyncService {
     }
 
     /**
-     * Laravel renders a Blade template {@code mails.service-provider-scheduling-mail}.
-     * Java assembles an equivalent HTML body inline — the Blade template can be
-     * introduced later as a FreeMarker / Thymeleaf file if content authors need to
-     * edit it without code changes.
+     * Renders the {@code sp-invite.html} template — pixel-faithful port of Laravel's
+     * {@code mails/service-provider-scheduling-mail.blade.php}.
      */
-    private String buildOnboardingEmailBody(String name, String email, String registrationUrl) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<p>Dear ").append(name != null ? escape(name) : "User").append(",</p>");
-        sb.append("<p>Welcome to Facilon Services. Please complete your user registration ")
-          .append("by following the link below:</p>");
-        sb.append("<p><a href=\"").append(registrationUrl).append("\">")
-          .append("Complete Registration</a></p>");
-        sb.append("<p>If the button above does not work, copy and paste this URL into your browser:<br>")
-          .append(registrationUrl).append("</p>");
-        sb.append("<p>Regards,<br>Team Facilon</p>");
-        return sb.toString();
+    private String renderInviteEmail(String name, String registrationUrl) {
+        Map<String, String> vars = new HashMap<>();
+        vars.put("name", name != null ? name : "Partner");
+        vars.put("service_agreement_url", registrationUrl);
+        return emailTemplateLoader.processTemplate("sp-invite.html", vars);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -330,9 +323,5 @@ public class PowerAppContactSyncService {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
-    }
-
-    private static String escape(String s) {
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

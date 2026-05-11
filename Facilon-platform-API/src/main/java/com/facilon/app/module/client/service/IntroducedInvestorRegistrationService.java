@@ -565,18 +565,23 @@ public class IntroducedInvestorRegistrationService {
 
             MicrosoftGraphResponseDto response = userMgmtClient.createUserLatest(signUpDto);
 
-            if (response != null && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
+            if (response != null
+                    && response.getId() != null && !response.getId().isBlank()
+                    && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
                 log.info("✅ B2C account created successfully for: {}, Azure ID: {}",
                         user.getEmailId(), response.getId());
 
-                // Save Azure user ID back (better than self-registration which doesn't do this)
                 user.setAzureAdUserId(response.getId());
                 authorizedUserRepository.save(user);
 
                 return true;
             } else {
-                log.error("❌ Azure B2C account creation failed for {}: {}",
-                        user.getEmailId(), response != null ? response.getErrorMsg() : "null response");
+                String reason = response == null
+                        ? "null response"
+                        : (response.getErrorMsg() != null && !response.getErrorMsg().isEmpty()
+                                ? response.getErrorMsg()
+                                : "no Azure id in response");
+                log.error("❌ Azure B2C account creation failed for {}: {}", user.getEmailId(), reason);
                 return false;
             }
         } catch (Exception e) {

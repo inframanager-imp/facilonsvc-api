@@ -12,6 +12,7 @@ import com.facilon.app.service.TenantB2CConfigService;
 import com.facilon.app.module.client.dto.onboarding.*;
 import com.facilon.app.module.client.model.Investor;
 import com.facilon.app.module.client.model.InvestorConsents;
+import com.facilon.app.module.client.model.InvestorType;
 import com.facilon.app.module.client.model.OtpVerification;
 import com.facilon.app.module.client.model.RegistrationSession;
 import com.facilon.app.module.client.model.UserPersonalInformation;
@@ -528,17 +529,24 @@ public class PublicRegistrationService {
     }
 
     private String determineInvestorType(IndividualRegistrationDto dto) {
-        // Logic to determine investor type based on nationality and residency
-        // This can be expanded based on business rules
-        if ("resident_indian".equalsIgnoreCase(dto.getResidencyType())) {
-            return "RESIDENT_INDIVIDUAL";
-        } else if ("non_resident_indian".equalsIgnoreCase(dto.getResidencyType())) {
-            return "NRI";
-        } else if (dto.getHasOciCard() != null && dto.getHasOciCard()) {
-            return "OCI";
-        } else {
+        boolean isIndianNationality = isIndiaId(dto.getNationality());
+        boolean isIndiaResidence = isIndiaId(dto.getCountryOfResidence());
+        boolean hasPan = Boolean.TRUE.equals(dto.getHasPanCard());
+        boolean hasOci = Boolean.TRUE.equals(dto.getHasOciCard());
+        Boolean isPio = isIndianNationality ? null : dto.getIsPersonOfIndianOrigin();
+
+        try {
+            return InvestorType.determineType(
+                    true, isIndianNationality, false, isIndiaResidence,
+                    hasPan, isPio, hasOci).name();
+        } catch (Exception e) {
+            log.warn("determineInvestorType failed: {}", e.getMessage());
             return "FOREIGN_NATIONAL";
         }
+    }
+
+    private static boolean isIndiaId(Integer id) {
+        return id != null && (id == 1 || id == 240);
     }
 
 
@@ -581,14 +589,22 @@ public class PublicRegistrationService {
                     .build();
             
             MicrosoftGraphResponseDto response = userMgmtClient.createUserLatest(signUpDto);
-            
-            // Check if user creation was successful
-            if (response != null && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
+
+            // Treat as success only if an Azure object id came back. An empty errorMsg alone is
+            // not enough — user-mgmt-service has returned 201 with an empty body when Graph
+            // rejected the call.
+            if (response != null
+                    && response.getId() != null && !response.getId().isBlank()
+                    && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
                 log.info("User created successfully in Azure AD for email: {}, Azure ID: {}", user.getEmailId(), response.getId());
                 return true;
             } else {
-                log.error("Azure AD user creation failed for {}: {}", user.getEmailId(), 
-                    response != null ? response.getErrorMsg() : "null response");
+                String reason = response == null
+                        ? "null response"
+                        : (response.getErrorMsg() != null && !response.getErrorMsg().isEmpty()
+                                ? response.getErrorMsg()
+                                : "no Azure id in response");
+                log.error("Azure AD user creation failed for {}: {}", user.getEmailId(), reason);
                 return false;
             }
         } catch (Exception e) {
