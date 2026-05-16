@@ -15,6 +15,7 @@ public interface AuthorizedUserRepository extends JpaRepository<AuthorizedUser, 
     Optional<AuthorizedUser> findByLoginId(String loginId);
     Optional<AuthorizedUser> findByEmailId(String loginId);
     Optional<AuthorizedUser> findById(Long id);
+    Optional<AuthorizedUser> findByAzureAdUserId(String azureAdUserId);
 
     @Query("SELECT DISTINCT u FROM AuthorizedUser u " +
            "JOIN u.userGroups g " +

@@ -338,6 +338,7 @@ public class ClientOnboardingService {
         investor.setVerifyStatus(2);
         investorRepository.save(investor);
 
+        String azureUserId = null;
         UserMgmtApiClient userMgmtClient = userMgmtApiClientProvider.getIfAvailable();
         if (userMgmtClient != null) {
             try {
@@ -362,10 +363,15 @@ public class ClientOnboardingService {
                             .country(investor.getNationality() != null ? String.valueOf(investor.getNationality()) : null)
                             .build();
                     var result = userMgmtClient.createUserLatest(signUpDto);
-                    if (result != null && result.getErrorMsg() != null && !result.getErrorMsg().isEmpty()) {
-                        log.warn("User-mgmt Azure AD creation reported: {}", result.getErrorMsg());
+                    if (result != null && result.getId() != null && !result.getId().isBlank()
+                            && (result.getErrorMsg() == null || result.getErrorMsg().isEmpty())) {
+                        azureUserId = result.getId();
+                        user.setAzureAdUserId(azureUserId);
+                        userRepository.save(user);
+                        log.info("User created in Azure AD for investor {} (Azure ID: {})", investor.getId(), azureUserId);
                     } else {
-                        log.info("User created in Azure AD for investor {}", investor.getId());
+                        log.warn("User-mgmt Azure AD creation reported: {}",
+                                result != null ? result.getErrorMsg() : "null response");
                     }
                 }
             } catch (Exception e) {
@@ -373,18 +379,23 @@ public class ClientOnboardingService {
             }
         }
 
-        // Send login credentials email with temporary password
-        try {
-            String fullName = user.getFirstName() + (user.getLastName() != null ? " " + user.getLastName() : "");
-            notificationService.sendLoginDetailsEmail(
-                    user.getEmailId(),
-                    fullName,
-                    user.getLoginId(),
-                    temporaryPassword,
-                    investor.getUniqueCode());
-            log.info("Login credentials email sent to {}", user.getEmailId());
-        } catch (Exception e) {
-            log.warn("Failed to send login credentials email: {}", e.getMessage());
+        // FISP-style: email the setpassword link rather than the temp password.
+        if (azureUserId != null) {
+            try {
+                String fullName = user.getFirstName() + (user.getLastName() != null ? " " + user.getLastName() : "");
+                String setPasswordUrl = buildSetPasswordUrl(azureUserId);
+                notificationService.sendLoginDetailsEmail(
+                        user.getEmailId(),
+                        fullName,
+                        user.getLoginId(),
+                        setPasswordUrl,
+                        investor.getUniqueCode());
+                log.info("Setpassword email sent to {}", user.getEmailId());
+            } catch (Exception e) {
+                log.warn("Failed to send setpassword email: {}", e.getMessage());
+            }
+        } else {
+            log.warn("Setpassword email NOT sent for {} because Azure user creation failed", user.getEmailId());
         }
 
         // Dataverse write-back (aligned to Laravel InvestorController::investor_register_step4_insert_data L727)
@@ -1043,5 +1054,11 @@ public class ClientOnboardingService {
     private String generateTemporaryPassword() {
         String randomDigits = String.format("%04d", RANDOM.nextInt(10000));
         return "Invest@" + randomDigits;
+    }
+
+    private String buildSetPasswordUrl(String azureUserId) {
+        String base = baseUrl != null && !baseUrl.isEmpty() ? baseUrl : "http://localhost:3000";
+        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        return trimmed + "/investor/setpassword/" + azureUserId;
     }
 }

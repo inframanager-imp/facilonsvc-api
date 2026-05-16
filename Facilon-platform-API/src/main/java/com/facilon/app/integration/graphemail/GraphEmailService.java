@@ -139,11 +139,13 @@ public class GraphEmailService {
     }
 
     /**
-     * Send login details email with temporary password
+     * Send the first-login email containing a setpassword link rather than a plaintext temp
+     * password (FISP-style). The user clicks the link, lands on /investor/setpassword/:azureUserId,
+     * and is driven through the B2C reset-password policy to choose their own password.
      */
-    public boolean sendLoginDetailsEmail(String toEmail, String investorName, String loginId, String temporaryPassword, String baseUrl) {
-        String subject = "Facilon - Your Login Credentials";
-        String htmlContent = buildLoginDetailsEmailHtml(investorName, loginId, temporaryPassword, baseUrl);
+    public boolean sendLoginDetailsEmail(String toEmail, String investorName, String loginId, String setPasswordUrl, String baseUrl) {
+        String subject = "Facilon - Set Your Password";
+        String htmlContent = buildLoginDetailsEmailHtml(investorName, loginId, setPasswordUrl, baseUrl);
         return sendEmail(toEmail, subject, htmlContent, investorName, null);
     }
 
@@ -351,13 +353,13 @@ public class GraphEmailService {
     }
 
     /**
-     * Build login details email HTML
+     * Build first-login email HTML — contains a setpassword link, no plaintext password.
      */
-    private String buildLoginDetailsEmailHtml(String investorName, String loginId, String temporaryPassword, String baseUrl) {
+    private String buildLoginDetailsEmailHtml(String investorName, String loginId, String setPasswordUrl, String baseUrl) {
         Map<String, String> variables = new HashMap<>();
         variables.put("investorName", investorName != null ? investorName : "Investor");
         variables.put("loginId", loginId);
-        variables.put("temporaryPassword", temporaryPassword);
+        variables.put("setPasswordUrl", setPasswordUrl);
         variables.put("baseUrl", baseUrl != null ? baseUrl : "http://localhost:3000");
         variables.put("supportEmail", "support@facilon.com");
         return emailTemplateLoader.processTemplate("01-login-details.html", variables);

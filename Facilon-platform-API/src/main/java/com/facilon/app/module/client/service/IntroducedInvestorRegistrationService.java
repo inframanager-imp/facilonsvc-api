@@ -448,15 +448,17 @@ public class IntroducedInvestorRegistrationService {
         introInvestorTempRepository.save(introInvestor);
 
         // **CRITICAL: Create B2C Account**
-        boolean b2cAccountCreated = createB2CAccount(user, password,
+        String azureUserId = createB2CAccount(user, password,
                 session.getFirstName() + " " + session.getLastName());
 
-        // Send registration credentials email ONLY if B2C account created
+        // FISP-style: email the setpassword link rather than the temp password itself.
+        boolean b2cAccountCreated = azureUserId != null;
         if (b2cAccountCreated) {
             sendRegistrationCredentialsEmail(session.getEmail(),
-                    session.getFirstName() + " " + session.getLastName(), password);
+                    session.getFirstName() + " " + session.getLastName(),
+                    buildSetPasswordUrl(azureUserId));
         } else {
-            log.warn("⚠️ Registration credentials email NOT sent because B2C account creation failed");
+            log.warn("⚠️ Setpassword email NOT sent because B2C account creation failed");
         }
 
         // Mark session as completed
@@ -525,20 +527,22 @@ public class IntroducedInvestorRegistrationService {
     // ============================================
 
     /**
-     * Create B2C account - aligned with PublicRegistrationService.createAzureUser()
+     * Create B2C account - aligned with PublicRegistrationService.createAzureUser().
+     * Returns the Azure object id on success, or {@code null} on failure. Callers use the
+     * returned GUID to build the FISP-style setpassword email link.
      */
-    private boolean createB2CAccount(AuthorizedUser user, String password, String displayName) {
+    private String createB2CAccount(AuthorizedUser user, String password, String displayName) {
         UserMgmtApiClient userMgmtClient = userMgmtClientProvider.getIfAvailable();
         if (userMgmtClient == null) {
             log.error("❌ User management service not available. B2C account NOT created for: {}", user.getEmailId());
-            return false;
+            return null;
         }
 
         try {
             TenantB2CConfig b2cConfig = tenantB2CConfigService.getConfigForCurrentTenantOrDefault();
             if (b2cConfig == null) {
                 log.error("❌ Azure B2C configuration not found. B2C account NOT created.");
-                return false;
+                return null;
             }
 
             // Determine correct tenant identifier — same as self-registration
@@ -568,13 +572,14 @@ public class IntroducedInvestorRegistrationService {
             if (response != null
                     && response.getId() != null && !response.getId().isBlank()
                     && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
+                String azureUserId = response.getId();
                 log.info("✅ B2C account created successfully for: {}, Azure ID: {}",
-                        user.getEmailId(), response.getId());
+                        user.getEmailId(), azureUserId);
 
-                user.setAzureAdUserId(response.getId());
+                user.setAzureAdUserId(azureUserId);
                 authorizedUserRepository.save(user);
 
-                return true;
+                return azureUserId;
             } else {
                 String reason = response == null
                         ? "null response"
@@ -582,33 +587,39 @@ public class IntroducedInvestorRegistrationService {
                                 ? response.getErrorMsg()
                                 : "no Azure id in response");
                 log.error("❌ Azure B2C account creation failed for {}: {}", user.getEmailId(), reason);
-                return false;
+                return null;
             }
         } catch (Exception e) {
             log.error("❌ Azure B2C account creation failed with exception for {}: {}",
                     user.getEmailId(), e.getMessage(), e);
-            return false;
+            return null;
         }
     }
 
-    private void sendRegistrationCredentialsEmail(String email, String investorName, String password) {
+    private void sendRegistrationCredentialsEmail(String email, String investorName, String setPasswordUrl) {
         GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
         if (graphEmailService != null) {
             try {
                 boolean sent = graphEmailService.sendLoginDetailsEmail(
-                        email, investorName, email, password, clientUrl);
+                        email, investorName, email, setPasswordUrl, clientUrl);
 
                 if (sent) {
-                    log.info("📧 Registration credentials email sent to {}", email);
+                    log.info("📧 Setpassword email sent to {}", email);
                 } else {
-                    log.warn("⚠️ Failed to send registration credentials email to {}", email);
+                    log.warn("⚠️ Failed to send setpassword email to {}", email);
                 }
             } catch (Exception e) {
-                log.error("❌ Failed to send registration credentials email to {}: {}", email, e.getMessage());
+                log.error("❌ Failed to send setpassword email to {}: {}", email, e.getMessage());
             }
         } else {
-            log.warn("⚠️ Graph Email service not available. Login credentials: email={}, password={}", email, password);
+            log.warn("⚠️ Graph Email service not available. Setpassword URL would have been: {}", setPasswordUrl);
         }
+    }
+
+    private String buildSetPasswordUrl(String azureUserId) {
+        String base = clientUrl != null && !clientUrl.isEmpty() ? clientUrl : "http://localhost:3000";
+        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        return trimmed + "/investor/setpassword/" + azureUserId;
     }
 
     // ============================================

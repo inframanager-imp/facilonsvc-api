@@ -361,11 +361,11 @@ public class PublicRegistrationService {
         saveInvestorConsents(uniqueCode, session, dto.getTermsAccepted(), dto.getDateOfBirth(), tenant);
 
         // Create user in Azure B2C
-        boolean azureUserCreated = createAzureUser(user, password);
+        String azureUserId = createAzureUser(user, password);
 
-        // Send login details email with temporary password ONLY if Azure user created successfully
-        if (azureUserCreated) {
-            sendLoginDetailsEmail(session.getEmail(), fullName, user.getLoginId(), password);
+        // FISP-style: email the setpassword link rather than the temp password itself.
+        if (azureUserId != null) {
+            sendLoginDetailsEmail(session.getEmail(), fullName, user.getLoginId(), buildSetPasswordUrl(azureUserId));
         } else {
             log.warn("Login details email NOT sent for {} because Azure user creation failed", session.getEmail());
         }
@@ -476,11 +476,12 @@ public class PublicRegistrationService {
         saveInvestorConsents(uniqueCode, session, dto.getTermsAccepted(), null, tenant);
 
         // Create user in Azure B2C
-        boolean azureUserCreated = createAzureUser(user, password);
+        String azureUserId = createAzureUser(user, password);
 
-        // Send login details email with temporary password ONLY if Azure user created successfully
-        if (azureUserCreated) {
-            sendLoginDetailsEmail(session.getEmail(), dto.getEntityRepresentativeName(), user.getLoginId(), password);
+        // FISP-style: email the setpassword link rather than the temp password itself.
+        if (azureUserId != null) {
+            sendLoginDetailsEmail(session.getEmail(), dto.getEntityRepresentativeName(),
+                    user.getLoginId(), buildSetPasswordUrl(azureUserId));
         } else {
             log.warn("Login details email NOT sent for {} because Azure user creation failed", session.getEmail());
         }
@@ -550,11 +551,17 @@ public class PublicRegistrationService {
     }
 
 
-    private boolean createAzureUser(AuthorizedUser user, String password) {
+    /**
+     * Creates the Azure B2C user, persists the returned object id onto the {@code AuthorizedUser},
+     * and returns the GUID (or {@code null} if creation failed). The GUID is the path token used
+     * by the FISP-style setpassword email link, so callers must use the returned value rather
+     * than re-reading {@code user.getAzureAdUserId()} (the entity may not be flushed yet).
+     */
+    private String createAzureUser(AuthorizedUser user, String password) {
         UserMgmtApiClient userMgmtClient = userMgmtClientProvider.getIfAvailable();
         if (userMgmtClient == null) {
             log.warn("User management service not available. User will not be created in Azure AD: {}", user.getEmailId());
-            return false;
+            return null;
         }
 
         try {
@@ -562,7 +569,7 @@ public class PublicRegistrationService {
             TenantB2CConfig b2cConfig = tenantB2CConfigService.getConfigForCurrentTenantOrDefault();
             if (b2cConfig == null) {
                 log.warn("Azure B2C configuration not found in database for current tenant. User will not be created in Azure AD.");
-                return false;
+                return null;
             }
             
             // Determine correct tenant identifier for Azure AD
@@ -596,8 +603,11 @@ public class PublicRegistrationService {
             if (response != null
                     && response.getId() != null && !response.getId().isBlank()
                     && (response.getErrorMsg() == null || response.getErrorMsg().isEmpty())) {
-                log.info("User created successfully in Azure AD for email: {}, Azure ID: {}", user.getEmailId(), response.getId());
-                return true;
+                String azureUserId = response.getId();
+                log.info("User created successfully in Azure AD for email: {}, Azure ID: {}", user.getEmailId(), azureUserId);
+                user.setAzureAdUserId(azureUserId);
+                userRepository.save(user);
+                return azureUserId;
             } else {
                 String reason = response == null
                         ? "null response"
@@ -605,11 +615,11 @@ public class PublicRegistrationService {
                                 ? response.getErrorMsg()
                                 : "no Azure id in response");
                 log.error("Azure AD user creation failed for {}: {}", user.getEmailId(), reason);
-                return false;
+                return null;
             }
         } catch (Exception e) {
             log.error("Azure AD user creation failed with exception for {}: {}", user.getEmailId(), e.getMessage(), e);
-            return false;
+            return null;
         }
     }
 
@@ -634,21 +644,27 @@ public class PublicRegistrationService {
         }
     }
 
-    private void sendLoginDetailsEmail(String email, String investorName, String loginId, String password) {
+    private void sendLoginDetailsEmail(String email, String investorName, String loginId, String setPasswordUrl) {
         GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
         if (graphEmailService != null) {
             try {
-                boolean sent = graphEmailService.sendLoginDetailsEmail(email, investorName, loginId, password, clientUrl);
+                boolean sent = graphEmailService.sendLoginDetailsEmail(email, investorName, loginId, setPasswordUrl, clientUrl);
                 if (sent) {
-                    log.info("Login details email sent to {}", email);
+                    log.info("Setpassword email sent to {}", email);
                 } else {
-                    log.warn("Failed to send login details email to {}", email);
+                    log.warn("Failed to send setpassword email to {}", email);
                 }
             } catch (Exception e) {
-                log.warn("Failed to send login details email to {}: {}", email, e.getMessage());
+                log.warn("Failed to send setpassword email to {}: {}", email, e.getMessage());
             }
         } else {
-            log.warn("Graph Email service not available. Login credentials: email={}, password={}", email, password);
+            log.warn("Graph Email service not available. Setpassword URL would have been: {}", setPasswordUrl);
         }
+    }
+
+    private String buildSetPasswordUrl(String azureUserId) {
+        String base = clientUrl != null && !clientUrl.isEmpty() ? clientUrl : "http://localhost:3000";
+        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        return trimmed + "/investor/setpassword/" + azureUserId;
     }
 }

@@ -360,14 +360,22 @@ public class AzureADUserController {
                 log.warn("Graph create-user returned no id. Body: {}", response);
                 return err;
             }
-            String authURL = "https://graph.microsoft.com/v1.0/users/" + microsoftGraphResponseDto.getId()
-                    + "/authentication/phoneMethods";
-            UserAuthenticationMobile userAuthenticationMobile = new UserAuthenticationMobile();
-            userAuthenticationMobile.setPhoneNumber(mobilePhone);
-            userAuthenticationMobile.setPhoneType("mobile");
-            okhttp3.RequestBody bodyAuth = okhttp3.RequestBody.create(mediaType, getJson(userAuthenticationMobile));
-            String authResponse = postServiceCall(authURL, bodyAuth, accessToken);
-            log.info("Auth Response From Add Phone = {}", authResponse);
+            // Only register a phone authentication method when the caller actually supplied one.
+            // Graph rejects an empty phoneNumber with 400 invalidPhoneNumber, which used to spam
+            // the logs after every registration that didn't collect a mobile.
+            if (mobilePhone != null && !mobilePhone.isBlank()) {
+                String authURL = "https://graph.microsoft.com/v1.0/users/" + microsoftGraphResponseDto.getId()
+                        + "/authentication/phoneMethods";
+                UserAuthenticationMobile userAuthenticationMobile = new UserAuthenticationMobile();
+                userAuthenticationMobile.setPhoneNumber(mobilePhone);
+                userAuthenticationMobile.setPhoneType("mobile");
+                okhttp3.RequestBody bodyAuth = okhttp3.RequestBody.create(mediaType, getJson(userAuthenticationMobile));
+                String authResponse = postServiceCall(authURL, bodyAuth, accessToken);
+                log.info("Auth Response From Add Phone = {}", authResponse);
+            } else {
+                log.info("Skipping phone authentication method for user {} — no mobile supplied",
+                        microsoftGraphResponseDto.getId());
+            }
 
             // Invitation invitation = new Invitation();
             // invitation.invitedUserEmailAddress = email;

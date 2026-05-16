@@ -32,27 +32,28 @@ public class InvestorNotificationService {
     private String supportPhone;
     
     /**
-     * 1. Send login credentials email after registration
+     * 1. Send the first-login email with a setpassword link (FISP-style).
+     * The template no longer renders a plaintext password.
      */
-    public void sendLoginDetailsEmail(String email, String investorName, String loginId, String temporaryPassword, String investorCode) {
+    public void sendLoginDetailsEmail(String email, String investorName, String loginId, String setPasswordUrl, String investorCode) {
         try {
-            String subject = "Facilon – Login Credentials";
-            
+            String subject = "Facilon – Set Your Password";
+
             Map<String, String> variables = new HashMap<>();
             variables.put("investorName", investorName);
             variables.put("loginId", loginId);
             variables.put("investorCode", investorCode);
-            variables.put("temporaryPassword", temporaryPassword);
+            variables.put("setPasswordUrl", setPasswordUrl);
             variables.put("baseUrl", baseUrl);
             variables.put("supportEmail", supportEmail);
             variables.put("supportPhone", supportPhone);
-            
+
             String htmlBody = templateLoader.processTemplate("01-login-details.html", variables);
             emailService.sendHtmlMessage(email, subject, htmlBody);
-            
-            log.info("Login details HTML email sent to: {}", email);
+
+            log.info("Setpassword email sent to: {}", email);
         } catch (Exception e) {
-            log.error("Failed to send login details email", e);
+            log.error("Failed to send setpassword email", e);
         }
     }
     
