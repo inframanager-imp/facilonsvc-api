@@ -3,6 +3,7 @@ package com.facilon.app.module.client.service;
 import com.facilon.app.module.client.dto.AccountDetailsDto;
 import com.facilon.app.module.client.dto.InvestorDashboardDto;
 import com.facilon.app.module.client.dto.InvestorProgressDto;
+import com.facilon.app.module.client.dto.JourneyListItemDto;
 import com.facilon.app.integration.dynamics.DataverseInvestorAssignmentDto;
 import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.module.client.model.*;
@@ -736,7 +737,7 @@ public class InvestorProgressService {
                                 .status(onboardingEnabled ? "Enabled" : "Blocked")
                                 .enabled(onboardingEnabled)
                                 .blockReason(onboardingEnabled ? null : "Product assignment pending from Service Provider")
-                                .actionRoute(onboardingEnabled ? "/investor/profile" : null)
+                                .actionRoute(onboardingEnabled ? "/investor/journey" : null)
                                 .build());
                 apps.add(InvestorDashboardDto.ApplicationItem.builder()
                                 .code("dsr")
@@ -790,6 +791,16 @@ public class InvestorProgressService {
 
         private String toStatus(boolean value) {
                 return value ? "Active" : "Missing";
+        }
+
+        /** Returns the first non-blank value, or null if all are blank. */
+        private String firstNonBlank(String... values) {
+                if (values == null) return null;
+                for (String v : values) {
+                        String t = trimToNull(v);
+                        if (t != null) return t;
+                }
+                return null;
         }
 
         private String trimToNull(String value) {
@@ -878,6 +889,95 @@ public class InvestorProgressService {
          * Get comprehensive account details for investor
          * Aligned with Laravel account-details.blade.php
          */
+        /**
+         * Lists all onboarding journeys (assigned products) for an investor.
+         * Real source: Dataverse ss_investorproducts filtered by the investor GUID;
+         * display names (product/scheme/plan/provider) are resolved via local master tables.
+         * Returns an empty list (never null) when no Dataverse GUID or no products exist.
+         */
+        public List<JourneyListItemDto> getInvestorJourneys(String uniqueCode) {
+                Investor investor = investorRepository.findByUniqueCode(uniqueCode)
+                                .orElseThrow(() -> new RuntimeException("Investor not found with unique code: " + uniqueCode));
+
+                IntroInvestorTemp introInvestor = introInvestorTempRepository
+                                .findByUniqueCodeDb(uniqueCode)
+                                .orElse(null);
+
+                // Resolve the investor's Dataverse GUID (same fallback order as getAccountDetails)
+                String investorGuid = introInvestor != null ? trimToNull(introInvestor.getIntroInvestorId()) : null;
+                if (investorGuid == null) investorGuid = trimToNull(investor.getDvInvestorSsId());
+                if (investorGuid == null && introInvestor != null) investorGuid = trimToNull(introInvestor.getIntroDvInvestorSsId());
+
+                if (investorGuid == null) {
+                        log.warn("[getInvestorJourneys] No Dataverse investor GUID for uniqueCode={}", uniqueCode);
+                        return new ArrayList<>();
+                }
+
+                List<Map<String, String>> rows = dynamicsCrmService.fetchInvestorProductsFromDataverse(investorGuid);
+                List<JourneyListItemDto> journeys = new ArrayList<>();
+
+                String schemeFallback = introInvestor != null ? trimToNull(introInvestor.getIntroSchemeName()) : null;
+                String providerTypeCode = introInvestor != null ? trimToNull(introInvestor.getServiceProviderType()) : null;
+
+                // Laravel parity: the canonical "Completed" signal is the local
+                // intro_investor_temp.ss_account_opening flag (investor-details-home.blade.php),
+                // not the Dataverse ss_investorproduct flag (which may be unset).
+                boolean introOpened = introInvestor != null && Boolean.TRUE.equals(introInvestor.getSsAccountOpening());
+                String introProductValue = introInvestor != null ? trimToNull(introInvestor.getSsProductValue()) : null;
+
+                for (Map<String, String> row : rows) {
+                        String journeyId = trimToNull(row.get("id"));
+                        String productGuid = trimToNull(row.get("ss_product_value"));
+                        String brokerGuid = trimToNull(row.get("ss_broker_value"));
+                        String planGuid = trimToNull(row.get("ss_plan_value"));
+
+                        // Prefer the denormalized names on ss_investorproduct; fall back to master-table resolution.
+                        String scheme = firstNonBlank(trimToNull(row.get("schemeName")), schemeFallback);
+                        String product = firstNonBlank(trimToNull(row.get("productName")),
+                                        resolveProductName(productGuid, scheme));
+                        String provider = firstNonBlank(trimToNull(row.get("brokerName")),
+                                        resolveServiceProviderDisplayName(brokerGuid, providerTypeCode));
+                        String plan = firstNonBlank(trimToNull(row.get("planName")), trimToNull(row.get("planPmName")));
+                        if (plan == null) plan = resolvePlanDisplayName(planGuid);
+
+                        boolean abandoned = "true".equalsIgnoreCase(row.getOrDefault("ss_abandonproduct", "false"));
+                        boolean opened = "1".equals(row.get("ss_accountopening"));
+                        // Fall back to the local intro flag (Laravel's source of truth) for the matching
+                        // product, or when there is only a single journey.
+                        if (!opened && introOpened
+                                        && ((introProductValue != null && introProductValue.equalsIgnoreCase(productGuid))
+                                                        || rows.size() == 1)) {
+                                opened = true;
+                        }
+                        String status = abandoned ? "ABANDONED" : (opened ? "COMPLETED" : "IN PROGRESS");
+
+                        // Real progress: 6 onboarding stages, account opening = final stage.
+                        int done = 0;
+                        if ("1".equals(row.get("st_personal"))) done++;
+                        if ("1".equals(row.get("st_kyc"))) done++;
+                        if ("1".equals(row.get("st_onboarding"))) done++;
+                        if ("1".equals(row.get("st_submitted"))) done++;
+                        if ("1".equals(row.get("st_verification"))) done++;
+                        if (opened) done++;
+                        int progress = opened ? 100 : Math.round((done * 100f) / 6f);
+
+                        journeys.add(JourneyListItemDto.builder()
+                                        .journeyId(journeyId)
+                                        .serviceProviderName(provider)
+                                        .product(product)
+                                        .productCode(trimToNull(row.get("name")))
+                                        .scheme(scheme)
+                                        .plan(plan)
+                                        .status(status)
+                                        .progress(progress)
+                                        .actionRoute(journeyId != null ? "/investor/journey/" + journeyId : "/investor/journey")
+                                        .build());
+                }
+
+                log.info("[getInvestorJourneys] {} journey(s) for uniqueCode={}", journeys.size(), uniqueCode);
+                return journeys;
+        }
+
         public AccountDetailsDto getAccountDetails(String uniqueCode) {
                 Investor investor = investorRepository.findByUniqueCode(uniqueCode)
                                 .orElseThrow(() -> new RuntimeException("Investor not found with unique code: " + uniqueCode));

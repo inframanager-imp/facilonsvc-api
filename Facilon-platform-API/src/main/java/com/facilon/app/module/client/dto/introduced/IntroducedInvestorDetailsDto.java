@@ -26,4 +26,6 @@ public class IntroducedInvestorDetailsDto {
     private String countryOfResidenceName;
     private String investorTypeName;
     private Boolean emailAlreadyExists;
+    private String isdCode;      // Dataverse country-of-residence ISD GUID
+    private String countryCode;  // resolved dialing code, e.g. "+65"
 }

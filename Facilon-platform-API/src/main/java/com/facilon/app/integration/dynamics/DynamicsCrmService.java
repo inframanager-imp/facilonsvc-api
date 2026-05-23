@@ -1663,6 +1663,103 @@ public class DynamicsCrmService {
     }
     
     /**
+     * Fetch ALL product/journey records for an investor from Dataverse ss_investorproducts.
+     * Each row represents one onboarding journey (a product the investor was assigned).
+     *
+     * <p>Returned maps carry the raw GUIDs/codes needed to resolve display names downstream
+     * (product/scheme/plan/broker) plus the journey id and status. Name resolution is left to
+     * the caller so existing master-table lookups can be reused.
+     *
+     * <p>NOTE (verify against the live tenant): the field names below are the expected
+     * ss_investorproducts columns. Adjust the keys if the Dataverse schema differs.
+     *
+     * @param investorGuid Investor GUID (actual GUID, not a display name like INV-1744)
+     * @return list of product/journey rows; empty list if none / not configured
+     */
+    public List<Map<String, String>> fetchInvestorProductsFromDataverse(String investorGuid) {
+        if (tokenProvider == null) {
+            log.warn("fetchInvestorProductsFromDataverse: tokenProvider not configured");
+            return new ArrayList<>();
+        }
+
+        String token = tokenProvider.getDynamicsToken();
+        String baseUrl = tokenProvider.getDynamicsBaseUrl();
+        if (token == null || baseUrl == null) {
+            log.warn("fetchInvestorProductsFromDataverse: missing Dynamics token or base URL");
+            return new ArrayList<>();
+        }
+
+        if (!isValidGuid(investorGuid)) {
+            log.error("❌ fetchInvestorProductsFromDataverse: invalid investor GUID: {}", investorGuid);
+            return new ArrayList<>();
+        }
+
+        try {
+            String filter = String.format("_ss_investor_value eq %s", investorGuid);
+            URI uri = UriComponentsBuilder
+                    .fromHttpUrl(baseUrl + "/ss_investorproducts")
+                    .queryParam("$filter", filter)
+                    .build().encode().toUri();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            headers.set("OData-MaxVersion", "4.0");
+            headers.set("OData-Version", "4.0");
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+            log.info("🔗 Fetching investor products (journeys) from Dataverse: {}", uri);
+
+            ResponseEntity<JsonNode> response = restTemplate.exchange(
+                    uri, HttpMethod.GET, new HttpEntity<>(headers), JsonNode.class);
+
+            JsonNode body = response.getBody();
+            if (body == null || !body.has("value") || !body.get("value").isArray()) {
+                log.warn("⚠️ fetchInvestorProductsFromDataverse: no value array for investor {}", investorGuid);
+                return new ArrayList<>();
+            }
+
+            List<Map<String, String>> journeys = new ArrayList<>();
+            for (JsonNode row : body.get("value")) {
+                Map<String, String> j = new HashMap<>();
+                j.put("id", getTextOrDefault(row, "ss_investorproductid", ""));
+                j.put("name", getTextOrDefault(row, "ss_name", "")); // record display column (auto-number code)
+                // Lookup GUIDs (for routing / master-table fallback)
+                j.put("ss_product_value", getTextOrDefault(row, "_ss_product_value", ""));
+                j.put("ss_broker_value", getTextOrDefault(row, "_ss_broker_value", ""));
+                j.put("ss_plan_value", getTextOrDefault(row, "_ss_plan_value", ""));
+                // Denormalized display names on ss_investorproduct (preferred — no GUID lookup needed)
+                j.put("productName", getTextOrDefault(row, "ss_productname", ""));
+                j.put("brokerName", getTextOrDefault(row, "ss_brokername", ""));
+                j.put("planName", getTextOrDefault(row, "ss_planname", ""));
+                j.put("planPmName", getTextOrDefault(row, "ss_planpmname", "")); // PMS plan variant
+                j.put("schemeName", getTextOrDefault(row, "ss_schemename", ""));
+                // Status flags — Dataverse may return these as boolean, "true"/"false", or 1/0
+                j.put("ss_abandonproduct", isTrue(row, "ss_abandonproduct") ? "true" : "false");
+                j.put("ss_accountopening", isTrue(row, "ss_accountopening") ? "1" : "2");
+                // Onboarding stage flags — used to derive real progress
+                j.put("st_personal", boolFlag(row, "ss_personaldetails"));
+                j.put("st_kyc", boolFlag(row, "ss_personaldocument"));
+                j.put("st_onboarding", boolFlag(row, "ss_onboardingdocuments"));
+                j.put("st_submitted", boolFlag(row, "ss_documentssubmitted"));
+                j.put("st_verification", boolFlag(row, "ss_inpersonverification"));
+                log.info("[journey-raw] name={} | accountopening={} abandon={} | personaldetails={} personaldocument={} onboardingdocuments={} documentssubmitted={} inpersonverification={}",
+                        j.get("name"),
+                        row.get("ss_accountopening"), row.get("ss_abandonproduct"),
+                        row.get("ss_personaldetails"), row.get("ss_personaldocument"),
+                        row.get("ss_onboardingdocuments"), row.get("ss_documentssubmitted"),
+                        row.get("ss_inpersonverification"));
+                journeys.add(j);
+            }
+            log.info("✅ fetchInvestorProductsFromDataverse: {} journey(s) for investor {}", journeys.size(), investorGuid);
+            return journeys;
+
+        } catch (Exception e) {
+            log.error("❌ Failed to fetch investor products from Dataverse: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
      * Get default account details (all fields set to "-")
      * Matches Laravel's $defaults array (lines 2082-2096)
      */
@@ -1683,6 +1780,27 @@ public class DynamicsCrmService {
         return defaults;
     }
     
+    /**
+     * Robustly interprets a Dataverse boolean-ish field. Dataverse/OData can serialize the same
+     * logical boolean as a JSON boolean (true), a string ("true"/"1"/"yes"), or a number (1).
+     */
+    private boolean isTrue(JsonNode node, String fieldName) {
+        JsonNode f = node.get(fieldName);
+        if (f == null || f.isNull()) return false;
+        if (f.isBoolean()) return f.asBoolean();
+        if (f.isNumber()) return f.asInt() == 1;
+        if (f.isTextual()) {
+            String v = f.asText().trim().toLowerCase();
+            return v.equals("true") || v.equals("1") || v.equals("yes");
+        }
+        return false;
+    }
+
+    /** Returns "1" if the boolean-ish field is true, else "0". */
+    private String boolFlag(JsonNode node, String fieldName) {
+        return isTrue(node, fieldName) ? "1" : "0";
+    }
+
     /**
      * Helper to extract text value from JsonNode or return default
      */

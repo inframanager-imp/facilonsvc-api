@@ -4,6 +4,8 @@ import com.facilon.app.config.TenantContextHolder;
 import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.integration.laravel.LaravelCryptPayloadDecryptor;
 import com.facilon.app.integration.graphemail.GraphEmailService;
+import com.facilon.app.module.serviceprovider.service.PdfGeneratorService;
+import com.facilon.app.util.EmailTemplateLoader;
 import com.facilon.app.integration.usermgmt.UserMgmtApiClient;
 import com.facilon.app.integration.usermgmt.dto.MicrosoftGraphResponseDto;
 import com.facilon.app.integration.usermgmt.dto.SignUpDto;
@@ -45,6 +47,8 @@ public class IntroducedInvestorRegistrationService {
     private static final Random RANDOM = new Random();
     private static final int OTP_EXPIRY_MINUTES = 10;
     private static final String DEFAULT_PASSWORD = "Invest@1234"; // Matches Laravel
+    private static final String CONSENT_VERSION = "1.0"; // Privacy Notice version (matches Laravel consentVersion)
+    private static final String TOU_CONSENT_VERSION = "V01"; // SR TOU consent version (matches Laravel default)
 
     private final DynamicsCrmService dynamicsCrmService;
     private final LaravelCryptPayloadDecryptor laravelCryptPayloadDecryptor;
@@ -55,6 +59,10 @@ public class IntroducedInvestorRegistrationService {
     private final IntroducedRegistrationSessionRepository sessionRepository;
     private final MasterNationalityRepository nationalityRepository;
     private final MasterCountryOfResidenceRepository countryOfResidenceRepository;
+    private final IsdCodeValuesRepository isdCodeValuesRepository;
+    private final EmailTemplateLoader emailTemplateLoader;
+    private final InvestorTouConsentRepository investorTouConsentRepository;
+    private final PdfGeneratorService pdfGeneratorService;
     private final InvestorConsentsRepository investorConsentsRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectProvider<GraphEmailService> graphEmailServiceProvider;
@@ -128,9 +136,19 @@ public class IntroducedInvestorRegistrationService {
 
         String ssInvestorTypeValue = (String) dataverseInvestor.get("_ss_investortype_value");
         String ssProductValue = (String) dataverseInvestor.get("_ss_product_value");
-        String ssBrokeragePlanValue = (String) dataverseInvestor.get("_ss_portfoliomanagerplan_value");
+        String ssBrokeragePlanValue = (String) dataverseInvestor.get("_ss_brokerageplan_value");
         String ssSchemeValue = (String) dataverseInvestor.get("_ss_scheme_value");
         String ssCountryOfResidenceValue = (String) dataverseInvestor.get("_ss_countryofresidence_value");
+        // ISD/country-dialing code GUID (Laravel: isd_code ← _ss_countryofresidenceisdcode_value).
+        String ssCountryOfResidenceIsdCode = (String) dataverseInvestor.get("_ss_countryofresidenceisdcode_value");
+
+        // Diagnostic: confirm what Dataverse returned for mobile + ISD, and how the dial code resolves.
+        log.info("📞 Dataverse intro fields for {}: mobile(ss_mobilephoneintroduceind)='{}', isdGuid='{}', resolvedDialCode='{}', email='{}', firstName='{}'",
+                dataverseInvestorId,
+                dataverseInvestor.get("ss_mobilephoneintroduceind"),
+                ssCountryOfResidenceIsdCode,
+                resolveDialCode(ssCountryOfResidenceIsdCode),
+                introEmail, introFirstName);
 
         // Check if email already exists
         Optional<AuthorizedUser> existingUser = authorizedUserRepository.findByEmailId(introEmail);
@@ -160,6 +178,7 @@ public class IntroducedInvestorRegistrationService {
         introInvestor.setSsBrokeragePlanValue(ssBrokeragePlanValue);
         introInvestor.setIntroSchemeName(ssSchemeValue);
         introInvestor.setIntroCountryOfResidence(ssCountryOfResidenceValue);
+        introInvestor.setIsdCode(ssCountryOfResidenceIsdCode);
         introInvestor.setTenant(tenant);
 
         introInvestor = introInvestorTempRepository.save(introInvestor);
@@ -195,6 +214,8 @@ public class IntroducedInvestorRegistrationService {
                 .countryOfResidenceName(countryOfResidenceName)
                 .investorTypeName(investorTypeName)
                 .emailAlreadyExists(emailExists)
+                .isdCode(ssCountryOfResidenceIsdCode)
+                .countryCode(resolveDialCode(ssCountryOfResidenceIsdCode))
                 .build();
     }
 
@@ -233,12 +254,135 @@ public class IntroducedInvestorRegistrationService {
 
         log.info("✅ Consent recorded for Dataverse ID: {}, uniqueCode: {}", dataverseInvestorId, uniqueCode);
 
+        // Send "Confirmation of Privacy Consent – Facilon" email (mirrors Laravel
+        // introduce_investor_register_step1_insert_data → consent-confirmation-mail).
+        sendConsentConfirmationEmail(introInvestor);
+
         return ApiResponseDto.builder()
                 .success(true)
                 .message("Consent recorded successfully")
                 .uniqueCode(uniqueCode)
                 .nextStep("step1")
                 .build();
+    }
+
+    /**
+     * Sends the "Confirmation of Privacy Consent – Facilon" email — identical subject and
+     * content to Laravel's {@code investor.consent-confirmation-mail} blade.
+     * Non-fatal: consent is already persisted, so an email failure must not break the flow.
+     */
+    private void sendConsentConfirmationEmail(IntroInvestorTemp introInvestor) {
+        try {
+            GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
+            if (graphEmailService == null) {
+                log.warn("[consent-email] GraphEmailService unavailable; skipping consent confirmation email");
+                return;
+            }
+            String email = introInvestor.getIntroEmail();
+            if (email == null || email.isBlank()) {
+                log.warn("[consent-email] No intro email; skipping consent confirmation email");
+                return;
+            }
+            String firstName = introInvestor.getIntroFirstName() != null ? introInvestor.getIntroFirstName() : "";
+            String lastName = introInvestor.getIntroLastName() != null ? introInvestor.getIntroLastName() : "";
+            String name = (firstName + " " + lastName).trim();
+            String datetime = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a"));
+            String privacyUrl = (clientUrl != null && !clientUrl.isEmpty() ? clientUrl : "http://localhost:3000")
+                    + "/privacy-policy";
+
+            String html = emailTemplateLoader.processTemplate("30-consent-confirmation.html", Map.of(
+                    "name", name,
+                    "version", CONSENT_VERSION,
+                    "datetime", datetime,
+                    "privacyUrl", privacyUrl));
+
+            boolean sent = graphEmailService.sendEmail(
+                    email, "Confirmation of Privacy Consent – Facilon", html, firstName, lastName);
+            log.info("[consent-email] Confirmation of Privacy Consent email sent={} to {}", sent, email);
+        } catch (Exception e) {
+            log.error("[consent-email] Failed to send consent confirmation email: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Persists the SR TOU consent and emails the executed Terms of Use PDF.
+     * Mirrors Laravel: insert into {@code investor_tou_consents} + render {@code sr_tou} PDF +
+     * send {@code tou-consent-confirmation-mail} with subject "SR TOU Executed Successfully".
+     * Non-fatal: registration is already complete, so a failure here must not break the flow.
+     */
+    private void sendSrTouConsentAndEmail(IntroducedRegistrationSession session, Tenant tenant) {
+        try {
+            String firstName = session.getFirstName() != null ? session.getFirstName() : "";
+            String lastName = session.getLastName() != null ? session.getLastName() : "";
+
+            // 1. Persist ToU consent (audit record)
+            InvestorTouConsent touConsent = InvestorTouConsent.builder()
+                    .consentVersion(TOU_CONSENT_VERSION)
+                    .consentedAt(LocalDateTime.now())
+                    .email(session.getEmail())
+                    .firstName(firstName)
+                    .middleName(session.getMiddleName())
+                    .lastName(lastName)
+                    .mobileNumber(session.getMobileNumber())
+                    .uniqueCode(session.getUniqueCode())
+                    .ipAddress(currentRequestValue(true))
+                    .userAgent(currentRequestValue(false))
+                    .build();
+            touConsent.setTenant(tenant);
+            investorTouConsentRepository.save(touConsent);
+
+            // 2. Email the executed SR TOU PDF
+            GraphEmailService graphEmailService = graphEmailServiceProvider.getIfAvailable();
+            if (graphEmailService == null) {
+                log.warn("[sr-tou] GraphEmailService unavailable; consent saved but email skipped");
+                return;
+            }
+            String email = session.getEmail();
+            if (email == null || email.isBlank()) {
+                log.warn("[sr-tou] No email on session; consent saved but email skipped");
+                return;
+            }
+
+            String fullName = (firstName + " " + lastName).trim();
+            String consentedAt = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Kolkata"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm")) + " IST (UTC +05:30)";
+
+            String emailHtml = emailTemplateLoader.processTemplate("31-tou-consent-confirmation.html", Map.of(
+                    "full_name", fullName,
+                    "consented_at", consentedAt,
+                    "consent_version", TOU_CONSENT_VERSION));
+
+            byte[] pdfBytes = pdfGeneratorService.htmlToPdf(loadSrTouHtml());
+
+            boolean sent = graphEmailService.sendEmailWithPdfBytes(
+                    email, "SR TOU Executed Successfully", emailHtml, "SR-TOU.pdf", pdfBytes);
+            log.info("[sr-tou] SR TOU Executed email sent={} to {}", sent, email);
+        } catch (Exception e) {
+            log.error("[sr-tou] Failed to record/send SR TOU consent: {}", e.getMessage(), e);
+        }
+    }
+
+    /** Loads the static SR TOU document (well-formed XHTML) from the classpath for PDF rendering. */
+    private String loadSrTouHtml() throws java.io.IOException {
+        org.springframework.core.io.ClassPathResource resource =
+                new org.springframework.core.io.ClassPathResource("templates/pdf/sr-tou.html");
+        try (java.io.InputStream in = resource.getInputStream()) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    /** Best-effort capture of the current request's IP ({@code ip=true}) or User-Agent ({@code ip=false}). */
+    private String currentRequestValue(boolean ip) {
+        try {
+            org.springframework.web.context.request.ServletRequestAttributes attrs =
+                    (org.springframework.web.context.request.ServletRequestAttributes)
+                            org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (attrs == null) return null;
+            return ip ? attrs.getRequest().getRemoteAddr() : attrs.getRequest().getHeader("User-Agent");
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
@@ -261,7 +405,35 @@ public class IntroducedInvestorRegistrationService {
                 .middleName(introInvestor != null ? introInvestor.getIntroMiddleName() : session.getMiddleName())
                 .lastName(introInvestor != null ? introInvestor.getIntroLastName() : session.getLastName())
                 .mobile(introInvestor != null ? introInvestor.getIntroMobile() : session.getMobileNumber())
+                .isdCode(introInvestor != null ? introInvestor.getIsdCode() : null)
+                .countryCode(introInvestor != null ? resolveDialCode(introInvestor.getIsdCode()) : null)
                 .build();
+    }
+
+    /**
+     * Resolve a Dataverse country-of-residence ISD GUID to a dialing code (e.g. "+65").
+     *
+     * <p>Chain: {@code _ss_countryofresidenceisdcode_value} GUID →
+     * {@code master_country_of_residence.ss_countryid} → country name →
+     * {@code isd_code_values.country_name} → {@code "+" + code_value}.
+     *
+     * <p>We resolve the dial number via {@code isd_code_values} (not
+     * {@code master_country_of_residence.ss_isdcode}, which the master sync fills with a
+     * GUID rather than the dial digits), so the returned value matches the dropdown options
+     * the frontend builds from the same {@code isd_code_values} list.
+     */
+    private String resolveDialCode(String isdGuid) {
+        if (isdGuid == null || isdGuid.isBlank()) {
+            return null;
+        }
+        return countryOfResidenceRepository.findBySsCountryId(isdGuid.trim())
+                .map(MasterCountryOfResidence::getSsName)
+                .filter(name -> name != null && !name.isBlank())
+                .flatMap(name -> isdCodeValuesRepository.findFirstByCountryNameIgnoreCase(name.trim()))
+                .map(isd -> isd.getCodeValue())
+                .filter(code -> code != null)
+                .map(code -> "+" + code)
+                .orElse(null);
     }
 
     /**
@@ -460,6 +632,10 @@ public class IntroducedInvestorRegistrationService {
         } else {
             log.warn("⚠️ Setpassword email NOT sent because B2C account creation failed");
         }
+
+        // Record SR TOU consent + email the executed Terms of Use PDF
+        // (mirrors Laravel introduce_investor_register_step4_insert_data → investor_tou_consents + sr_tou PDF).
+        sendSrTouConsentAndEmail(session, tenant);
 
         // Mark session as completed
         session.setRegistrationCompleted(true);

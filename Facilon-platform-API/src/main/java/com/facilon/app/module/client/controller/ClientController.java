@@ -7,6 +7,7 @@ import com.facilon.app.module.client.dto.InvestorUpdateDto;
 import com.facilon.app.module.client.dto.InvestorProgressDto;
 import com.facilon.app.module.client.dto.InvestorDashboardDto;
 import com.facilon.app.module.client.dto.AccountDetailsDto;
+import com.facilon.app.module.client.dto.JourneyListItemDto;
 import com.facilon.app.module.client.service.ClientService;
 import com.facilon.app.module.client.service.InvestorProgressService;
 import com.facilon.app.security.UserPrincipal;
@@ -169,6 +170,27 @@ public class ClientController {
             return ResponseEntity.ok(accountDetails);
         } catch (RuntimeException e) {
             log.error("Error getting account details: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
+
+    /**
+     * List all onboarding journeys (assigned products) for the current investor.
+     * Each item carries a journeyId used to route to that specific journey.
+     */
+    @GetMapping("/me/journeys")
+    @Operation(summary = "Get my journeys", description = "List all onboarding journeys (assigned products) for the current investor")
+    public ResponseEntity<java.util.List<JourneyListItemDto>> getMyJourneys(Authentication authentication) {
+        log.info("Get my journeys request");
+
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        Long currentUserId = userPrincipal.getId();
+
+        try {
+            InvestorDto client = clientService.getMyClientProfile(currentUserId);
+            return ResponseEntity.ok(investorProgressService.getInvestorJourneys(client.getUniqueCode()));
+        } catch (RuntimeException e) {
+            log.error("Error getting journeys: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }

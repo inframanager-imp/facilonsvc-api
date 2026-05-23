@@ -610,7 +610,7 @@ public class DataverseMasterSyncService {
             unique.put(residenceId, MasterCountryOfResidence.builder()
                     .ssCountryId(residenceId)
                     .ssName(countryName)
-                    .ssIsdCode(isdEntry[1])
+                    .ssIsdCode(code) // dial digits (e.g. "65"); was wrongly set to ss_isdcodeid GUID
                     .build());
         }
         if (unique.isEmpty()) return 0;
