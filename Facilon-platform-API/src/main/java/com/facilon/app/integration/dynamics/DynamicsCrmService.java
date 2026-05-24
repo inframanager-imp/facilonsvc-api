@@ -2104,10 +2104,27 @@ public class DynamicsCrmService {
      * Laravel: DB::table('master_country_of_residence')->where('ss_countryid', '=', $guid)->first()
      */
     public String fetchCountryOfResidenceName(String countryGuid) {
+        if (countryGuid == null || countryGuid.isBlank()) {
+            return null;
+        }
         try {
-            return countryOfResidenceRepository.findBySsCountryId(countryGuid)
-                    .map(MasterCountryOfResidence::getSsName)
-                    .orElse(null);
+            // Local master first (with GUID format variants).
+            for (String candidate : guidLookupCandidates(countryGuid)) {
+                Optional<String> local = countryOfResidenceRepository.findBySsCountryId(candidate)
+                        .map(MasterCountryOfResidence::getSsName);
+                if (local.isPresent()) {
+                    return local.get();
+                }
+            }
+            // Live Dataverse fallback when the GUID isn't seeded locally.
+            for (String candidate : guidLookupCandidates(countryGuid)) {
+                String fromDv = tryFetchEntitySsName(candidate, "ss_countryofresidences");
+                if (fromDv != null) {
+                    return fromDv;
+                }
+            }
+            log.warn("Country of residence not resolved for GUID {} — not in master_country_of_residence nor ss_countryofresidences", countryGuid);
+            return null;
         } catch (Exception e) {
             log.error("Failed to fetch country of residence name for GUID {}: {}", countryGuid, e.getMessage());
             return null;

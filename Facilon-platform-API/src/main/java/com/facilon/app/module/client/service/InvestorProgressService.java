@@ -10,6 +10,9 @@ import com.facilon.app.module.client.model.*;
 import com.facilon.app.module.client.model.master.MasterAccounts;
 import com.facilon.app.module.client.model.master.MasterBrokers;
 import com.facilon.app.module.client.model.master.MasterCountries;
+import com.facilon.app.module.client.model.master.MasterCountryOfResidence;
+import com.facilon.app.module.client.model.master.MasterInvestorTypes;
+import com.facilon.app.module.client.model.master.MasterNationality;
 import com.facilon.app.module.client.model.master.MasterPlans;
 import com.facilon.app.module.client.model.master.MasterProducts;
 import com.facilon.app.module.client.model.master.MasterServiceProviderType;
@@ -47,6 +50,9 @@ public class InvestorProgressService {
         private final MasterPlansRepository masterPlansRepository;
         private final MasterServiceProviderTypeRepository masterServiceProviderTypeRepository;
         private final MasterCountriesRepository masterCountriesRepository;
+        private final MasterCountryOfResidenceRepository masterCountryOfResidenceRepository;
+        private final MasterNationalityRepository masterNationalityRepository;
+        private final MasterInvestorTypesRepository masterInvestorTypesRepository;
         private final DynamicsCrmService dynamicsCrmService;
         private final InvestorServiceAgentDelegationRepository delegationRepository;
         private final ServiceAgentRepository serviceAgentRepository;
@@ -200,16 +206,97 @@ public class InvestorProgressService {
 
                 // Build basic investor info
                 AuthorizedUser user = investor.getAuthorizedUser();
+
+                // Some registration paths persist these on the personal-info row rather than the
+                // investor row, so fall back to it when the investor columns are null.
+                UserPersonalInformation personalInfo = personalInformationRepository
+                                .findByInvestorUniqueId(uniqueCode).orElse(null);
+                Integer nationalityId = investor.getNationality() != null
+                                ? investor.getNationality()
+                                : parseCountryId(personalInfo != null ? personalInfo.getCitizenship() : null);
+                Integer residenceId = investor.getCountryOfResidence() != null
+                                ? investor.getCountryOfResidence()
+                                : parseCountryId(personalInfo != null ? personalInfo.getCountryOfResidence() : null);
+                String middleName = personalInfo != null ? personalInfo.getInvestorMiddleName() : null;
+                // Middle name: personal-info row first, then the Dataverse mirror (broker-entered).
+                if ((middleName == null || middleName.isBlank()) && introInvestor != null) {
+                        middleName = trimToNull(introInvestor.getIntroMiddleName());
+                }
+
+                // Country of residence id lives in master_country_of_residence (introduced flow);
+                // resolve there first, then the Dataverse GUID, then the legacy master_countries
+                // table (older/self-register rows), and finally "NA".
+                String residenceName = resolveCountryOfResidenceNameById(investor.getCountryOfResidence());
+                if (isUnresolvedName(residenceName) && introInvestor != null
+                                && trimToNull(introInvestor.getIntroCountryOfResidence()) != null) {
+                        residenceName = resolveCountryOfResidenceNameByGuid(
+                                        introInvestor.getIntroCountryOfResidence().trim());
+                }
+                if (isUnresolvedName(residenceName)) {
+                        String legacy = resolveCountryName(residenceId);
+                        if (!isUnresolvedName(legacy)) {
+                                residenceName = legacy;
+                        }
+                }
+                if (isUnresolvedName(residenceName)) {
+                        residenceName = "NA";
+                }
+
+                // Nationality id lives in master_nationality (introduced flow); same resolution
+                // chain as above.
+                String nationalityName = resolveNationalityNameById(investor.getNationality());
+                if (isUnresolvedName(nationalityName) && introInvestor != null
+                                && trimToNull(introInvestor.getIntroDvNationality()) != null) {
+                        nationalityName = resolveNationalityNameByGuid(introInvestor.getIntroDvNationality().trim());
+                }
+                if (isUnresolvedName(nationalityName)) {
+                        String legacy = resolveCountryName(nationalityId);
+                        if (!isUnresolvedName(legacy)) {
+                                nationalityName = legacy;
+                        }
+                }
+                if (isUnresolvedName(nationalityName)) {
+                        nationalityName = "NA";
+                }
+
+                // Investor type: the RAW enum constant (e.g. RESIDENT_INDIVIDUAL, NRI) — the
+                // frontend's per-type tab/field visibility keys off this exact value, so it must
+                // NOT be a display name. Fall back to the Dataverse mirror's investor-type GUID
+                // (master_investor_types) only when the investor row's column is empty.
+                String investorTypeName = trimToNull(investor.getInvestorType());
+                if (investorTypeName == null && introInvestor != null
+                                && trimToNull(introInvestor.getSsInvestorTypeValue()) != null) {
+                        String byGuid = resolveInvestorTypeNameByGuid(introInvestor.getSsInvestorTypeValue().trim());
+                        if (byGuid != null) {
+                                investorTypeName = byGuid;
+                        }
+                }
+                // Normalise to the canonical enum constant (e.g. "Resident - Individual" →
+                // RESIDENT_INDIVIDUAL) so the frontend's per-type tab/field visibility always
+                // matches, regardless of whether the value came from the investor row or
+                // master_investor_types.ss_name.
+                investorTypeName = canonicalInvestorType(investorTypeName);
+
+                log.info("[getInvestorDashboard] uniqueCode={} resolved → nationality='{}', countryOfResidence='{}', "
+                                + "investorType='{}', middleName='{}' (investor.nationalityId={}, investor.countryOfResidenceId={}, "
+                                + "intro.dvNationality={}, intro.countryOfResidence={}, intro.investorTypeGuid={})",
+                                uniqueCode, nationalityName, residenceName, investorTypeName, middleName,
+                                investor.getNationality(), investor.getCountryOfResidence(),
+                                introInvestor != null ? introInvestor.getIntroDvNationality() : null,
+                                introInvestor != null ? introInvestor.getIntroCountryOfResidence() : null,
+                                introInvestor != null ? introInvestor.getSsInvestorTypeValue() : null);
+
                 InvestorDashboardDto.InvestorBasicInfo basicInfo = InvestorDashboardDto.InvestorBasicInfo.builder()
                                 .name(user != null ? user.getFirstName() + " " +
                                                 (user.getLastName() != null ? user.getLastName() : "") : "")
                                 .firstName(user != null ? user.getFirstName() : "")
+                                .middleName(middleName)
                                 .lastName(user != null ? user.getLastName() : "")
                                 .email(user != null ? user.getEmailId() : "")
                                 .mobileNumber(user != null ? user.getMobilePhone() : "")
-                                .nationality(resolveCountryName(investor.getNationality()))
-                                .countryOfResidence(resolveCountryName(investor.getCountryOfResidence()))
-                                .investorType(investor.getInvestorType())
+                                .nationality(nationalityName)
+                                .countryOfResidence(residenceName)
+                                .investorType(investorTypeName)
                                 .uniqueCode(investor.getUniqueCode())
                                 .status(investor.getVerifyStatus())
                                 .registerAs(investor.getRegisterAs() != null ? investor.getRegisterAs().toString()
@@ -245,7 +332,7 @@ public class InvestorProgressService {
                 InvestorDashboardDto.AccountSummary accountSummary = buildAccountSummary(uniqueCode);
                 InvestorDashboardDto.AccountSnapshot snapshot = InvestorDashboardDto.AccountSnapshot.builder()
                                 .investorId(investor.getUniqueCode())
-                                .primaryJurisdiction(resolveCountryName(investor.getCountryOfResidence()))
+                                .primaryJurisdiction(residenceName)
                                 .eligibility(onboardingEnabled ? "Eligible" : "Partially Eligible")
                                 .lastActivity(formatDateTime(investor.getUpdatedAt() != null ? investor.getUpdatedAt() : investor.getCreatedAt()))
                                 .build();
@@ -707,6 +794,145 @@ public class InvestorProgressService {
                 if (local.isPresent()) return local.get();
                 // Dataverse live fallback — ss_plans or ss_portfoliomanagerplans
                 return dynamicsCrmService.fetchPlanName(planGuid).orElse(planGuid);
+        }
+
+        /**
+         * Parses a numeric country id stored as a String. Some registration paths persist
+         * {@code country_of_residence}/{@code citizenship} as text on the personal-info row.
+         */
+        private Integer parseCountryId(String value) {
+                if (value == null || value.isBlank()) {
+                        return null;
+                }
+                try {
+                        return Integer.valueOf(value.trim());
+                } catch (NumberFormatException ignored) {
+                        return null;
+                }
+        }
+
+        /**
+         * Normalises any investor-type label — the enum constant, its display name, or the
+         * master_investor_types.ss_name — to the canonical {@link InvestorType} enum constant the
+         * frontend keys its visibility rules off (e.g. "Resident - Individual" →
+         * RESIDENT_INDIVIDUAL). Returns the raw value unchanged when nothing matches, so the
+         * frontend falls back to "show all tabs" rather than hiding the wrong ones.
+         */
+        private String canonicalInvestorType(String raw) {
+                if (raw == null || raw.isBlank()) {
+                        return null;
+                }
+                String value = raw.trim();
+                for (InvestorType t : InvestorType.values()) {
+                        if (t.name().equalsIgnoreCase(value) || t.getDisplayName().equalsIgnoreCase(value)) {
+                                return t.name();
+                        }
+                }
+                return value;
+        }
+
+        /**
+         * Resolves a Dataverse country-of-residence GUID (as stored in intro_investor_temp) to its
+         * display name via master_country_of_residence. Returns {@code null} when it cannot be
+         * resolved, so the caller keeps its existing value/placeholder.
+         */
+        private String resolveCountryOfResidenceNameByGuid(String guid) {
+                if (guid == null || guid.isBlank() || masterCountryOfResidenceRepository == null) {
+                        return null;
+                }
+                try {
+                        String name = masterCountryOfResidenceRepository.findBySsCountryId(guid.trim())
+                                        .map(MasterCountryOfResidence::getSsName)
+                                        .filter(n -> n != null && !n.isBlank())
+                                        .orElse(null);
+                        if (name == null && dynamicsCrmService != null) {
+                                // Not seeded locally — resolve live from Dataverse (ss_countryofresidences).
+                                name = trimToNull(dynamicsCrmService.fetchCountryOfResidenceName(guid.trim()));
+                        }
+                        log.info("[resolve] countryOfResidence GUID={} → name={}", guid, name);
+                        return name;
+                } catch (Exception ignored) {
+                        return null;
+                }
+        }
+
+        /**
+         * Resolves a Dataverse nationality GUID (intro_investor_temp.intro_dv_nationality) to its
+         * display name via master_nationality. Returns {@code null} when unresolvable.
+         */
+        private String resolveNationalityNameByGuid(String guid) {
+                if (guid == null || guid.isBlank() || masterNationalityRepository == null) {
+                        return null;
+                }
+                try {
+                        String name = masterNationalityRepository.findBySsNationalityId(guid.trim())
+                                        .map(MasterNationality::getSsName)
+                                        .filter(n -> n != null && !n.isBlank())
+                                        .orElse(null);
+                        if (name == null && dynamicsCrmService != null) {
+                                // Not seeded locally — resolve live from Dataverse (ss_countries/ss_nationalities).
+                                name = trimToNull(dynamicsCrmService.fetchNationalityName(guid.trim()));
+                        }
+                        log.info("[resolve] nationality GUID={} → name={}", guid, name);
+                        return name;
+                } catch (Exception ignored) {
+                        return null;
+                }
+        }
+
+        /**
+         * Resolves a Dataverse investor-type GUID (intro_investor_temp.ss_investortype_value) to its
+         * display name via master_investor_types. Returns {@code null} when unresolvable.
+         */
+        private String resolveInvestorTypeNameByGuid(String guid) {
+                if (guid == null || guid.isBlank() || masterInvestorTypesRepository == null) {
+                        return null;
+                }
+                try {
+                        String name = masterInvestorTypesRepository.findBySsInvestorTypeId(guid.trim())
+                                        .map(MasterInvestorTypes::getSsName)
+                                        .filter(n -> n != null && !n.isBlank())
+                                        .orElse(null);
+                        log.info("[resolve] investorType GUID={} → name={}", guid, name);
+                        return name;
+                } catch (Exception ignored) {
+                        return null;
+                }
+        }
+
+        /** True when a resolved name is missing, the "NA" placeholder, or a bare numeric id. */
+        private static boolean isUnresolvedName(String name) {
+                return name == null || name.isBlank() || "NA".equalsIgnoreCase(name) || name.matches("\\d+");
+        }
+
+        /** Resolves a master_nationality local id to its display name. */
+        private String resolveNationalityNameById(Integer id) {
+                if (id == null || masterNationalityRepository == null) {
+                        return null;
+                }
+                try {
+                        return masterNationalityRepository.findById(id.longValue())
+                                        .map(MasterNationality::getSsName)
+                                        .filter(name -> name != null && !name.isBlank())
+                                        .orElse(null);
+                } catch (Exception ignored) {
+                        return null;
+                }
+        }
+
+        /** Resolves a master_country_of_residence local id to its display name. */
+        private String resolveCountryOfResidenceNameById(Integer id) {
+                if (id == null || masterCountryOfResidenceRepository == null) {
+                        return null;
+                }
+                try {
+                        return masterCountryOfResidenceRepository.findById(id.longValue())
+                                        .map(MasterCountryOfResidence::getSsName)
+                                        .filter(name -> name != null && !name.isBlank())
+                                        .orElse(null);
+                } catch (Exception ignored) {
+                        return null;
+                }
         }
 
         private String resolveCountryName(Integer countryId) {
