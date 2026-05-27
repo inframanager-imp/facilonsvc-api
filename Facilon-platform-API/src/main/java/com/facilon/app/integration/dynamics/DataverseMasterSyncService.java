@@ -65,6 +65,7 @@ public class DataverseMasterSyncService {
     private final MasterTypeOfVisaRepository masterTypeOfVisaRepository;
     private final MasterPmsBanksRepository masterPmsBanksRepository;
     private final MasterCountryOfResidenceRepository masterCountryOfResidenceRepository;
+    private final MasterNationalityRepository masterNationalityRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public "sync all critical" entry point  (used by admin /sync-all endpoint)
@@ -95,6 +96,7 @@ public class DataverseMasterSyncService {
         results.put("visaTypes",            runSync("visaTypes",            this::syncVisaTypes));
         results.put("pmsBanks",             runSync("pmsBanks",             this::syncPmsBanks));
         results.put("countryOfResidence",   runSync("countryOfResidence",   this::syncCountryOfResidence));
+        results.put("nationality",           runSync("nationality",          this::syncNationality));
         return results;
     }
 
@@ -364,6 +366,39 @@ public class DataverseMasterSyncService {
                 .build()).toList();
         masterCountriesRepository.saveAll(entities);
         log.info("syncCountries: saved {} records", entities.size());
+        return entities.size();
+    }
+
+    /**
+     * Nationality master. The investor's {@code _ss_nationality_value} lookup (and the
+     * {@code ss_Nationality@odata.bind} on submit) points at the {@code ss_nationalities}
+     * entity, so master_nationality.ss_nationalityid must hold those Dataverse GUIDs.
+     *
+     * <p>Laravel has no sync for this (its {@code fetch_nationality_from_dv} actually loads
+     * investor types); its master_nationality rows were loaded manually. This adds the proper
+     * sync so the GUID lookups match like every other master.
+     *
+     * URL: {@code GET /ss_nationalities}
+     * Table: {@code master_nationality}
+     */
+    @Transactional
+    public int syncNationality() {
+        List<JsonNode> rows = fetchAllPages("ss_nationalities", null);
+        if (rows.isEmpty()) return 0;
+
+        masterNationalityRepository.deleteAll();
+        final int[] idx = {1};
+        List<MasterNationality> entities = rows.stream()
+                .filter(r -> text(r, "ss_nationalityid") != null)
+                .map(r -> MasterNationality.builder()
+                        .id(idx[0]++)
+                        .ssNationalityId(text(r, "ss_nationalityid"))
+                        .ssName(text(r, "ss_name"))
+                        .ssNationality(text(r, "ss_nationality"))
+                        .build())
+                .toList();
+        masterNationalityRepository.saveAll(entities);
+        log.info("syncNationality: saved {} records", entities.size());
         return entities.size();
     }
 

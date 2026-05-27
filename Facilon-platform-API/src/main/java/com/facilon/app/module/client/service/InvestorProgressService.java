@@ -224,9 +224,17 @@ public class InvestorProgressService {
                 }
 
                 // Country of residence id lives in master_country_of_residence (introduced flow);
-                // resolve there first, then the Dataverse GUID, then the legacy master_countries
-                // table (older/self-register rows), and finally "NA".
+                // resolve there first. master_country_of_residence is keyed by the ISD-code entity
+                // (ss_countryofresidenceisdcodeid), which matches intro.isdCode
+                // (_ss_countryofresidenceisdcode_value) — NOT intro.introCountryOfResidence
+                // (_ss_countryofresidence_value), a different Dataverse entity. So try the ISD GUID
+                // against the master table, then the country GUID via live Dataverse, then the
+                // legacy master_countries table, and finally "NA".
                 String residenceName = resolveCountryOfResidenceNameById(investor.getCountryOfResidence());
+                if (isUnresolvedName(residenceName) && introInvestor != null
+                                && trimToNull(introInvestor.getIsdCode()) != null) {
+                        residenceName = resolveCountryOfResidenceNameByGuid(introInvestor.getIsdCode().trim());
+                }
                 if (isUnresolvedName(residenceName) && introInvestor != null
                                 && trimToNull(introInvestor.getIntroCountryOfResidence()) != null) {
                         residenceName = resolveCountryOfResidenceNameByGuid(
@@ -279,11 +287,12 @@ public class InvestorProgressService {
 
                 log.info("[getInvestorDashboard] uniqueCode={} resolved → nationality='{}', countryOfResidence='{}', "
                                 + "investorType='{}', middleName='{}' (investor.nationalityId={}, investor.countryOfResidenceId={}, "
-                                + "intro.dvNationality={}, intro.countryOfResidence={}, intro.investorTypeGuid={})",
+                                + "intro.dvNationality={}, intro.countryOfResidence={}, intro.isdCode={}, intro.investorTypeGuid={})",
                                 uniqueCode, nationalityName, residenceName, investorTypeName, middleName,
                                 investor.getNationality(), investor.getCountryOfResidence(),
                                 introInvestor != null ? introInvestor.getIntroDvNationality() : null,
                                 introInvestor != null ? introInvestor.getIntroCountryOfResidence() : null,
+                                introInvestor != null ? introInvestor.getIsdCode() : null,
                                 introInvestor != null ? introInvestor.getSsInvestorTypeValue() : null);
 
                 InvestorDashboardDto.InvestorBasicInfo basicInfo = InvestorDashboardDto.InvestorBasicInfo.builder()

@@ -585,6 +585,20 @@ public class IntroducedInvestorRegistrationService {
         String investorType = determineInvestorTypeName(
                 registerAs, nationalityId, residenceId,
                 dto.getPanCardStatus(), dto.getIndianOrigin(), dto.getOciCardStatus());
+        if (investorType == null) {
+            // Rule-based derivation bailed (nationality/residence GUID not in the local master
+            // tables). Fall back to the Dataverse-assigned investor-type GUID the broker/PM set
+            // in CRM, so investor_type is still captured on the row.
+            investorType = canonicalInvestorTypeFromGuid(introInvestor.getSsInvestorTypeValue());
+            if (investorType != null) {
+                log.info("[introducedRegistration] investor_type derived from Dataverse type GUID {} → {}",
+                        introInvestor.getSsInvestorTypeValue(), investorType);
+            } else {
+                log.warn("[introducedRegistration] Could not capture investor_type for uniqueCode={} "
+                        + "(nationality GUID {} unresolved, type GUID {} unresolved)",
+                        dto.getUniqueCode(), dto.getNationality(), introInvestor.getSsInvestorTypeValue());
+            }
+        }
 
         Investor investor = Investor.builder()
                 .authorizedUser(user)
@@ -887,6 +901,30 @@ public class IntroducedInvestorRegistrationService {
             log.warn("determineInvestorTypeName failed: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Resolves the Dataverse investor-type GUID (intro_investor_temp.ss_investortype_value) to a
+     * canonical {@link com.facilon.app.module.client.model.InvestorType} enum constant, via
+     * master_investor_types.ss_name matched against the enum's name/display name. Returns null when
+     * the GUID can't be resolved or doesn't map to a known type (so we store the enum or nothing —
+     * never a non-enum string).
+     */
+    private String canonicalInvestorTypeFromGuid(String typeGuid) {
+        if (typeGuid == null || typeGuid.isBlank() || dynamicsCrmService == null) {
+            return null;
+        }
+        String ssName = dynamicsCrmService.fetchInvestorTypeName(typeGuid.trim());
+        if (ssName == null || ssName.isBlank()) {
+            return null;
+        }
+        for (com.facilon.app.module.client.model.InvestorType t
+                : com.facilon.app.module.client.model.InvestorType.values()) {
+            if (t.name().equalsIgnoreCase(ssName.trim()) || t.getDisplayName().equalsIgnoreCase(ssName.trim())) {
+                return t.name();
+            }
+        }
+        return null;
     }
 
     /**
