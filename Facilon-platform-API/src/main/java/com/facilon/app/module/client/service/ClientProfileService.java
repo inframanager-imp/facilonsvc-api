@@ -212,6 +212,43 @@ public class ClientProfileService {
     }
 
     /**
+     * Activate/revoke a manageable consent from the Consent Centre. Supports the optional
+     * marketing and WhatsApp consents (Privacy/Platform Terms/SOW are handled elsewhere).
+     */
+    @Transactional
+    public void updateConsent(Long userId, String key, String action) {
+        Investor investor = getInvestorForUser(userId);
+        boolean activate = "activate".equalsIgnoreCase(action);
+        if (!activate && !"revoke".equalsIgnoreCase(action)) {
+            throw new IllegalArgumentException("Unsupported action: " + action);
+        }
+        InvestorConsents consents = consentsRepository.findByInvestorUniqueId(investor.getUniqueCode())
+                .orElseGet(() -> {
+                    InvestorConsents c = new InvestorConsents();
+                    c.setInvestorUniqueId(investor.getUniqueCode());
+                    c.setTenant(TenantContextHolder.getContext().getTenant());
+                    return c;
+                });
+        switch (key == null ? "" : key.toLowerCase()) {
+            case "marketing":
+                consents.setMarketingConsent(activate);
+                break;
+            case "whatsapp":
+                consents.setWhatsappConsent(activate);
+                break;
+            case "privacy":
+                consents.setPrivacyPolicyAccepted(activate);
+                break;
+            case "platformterms":
+                consents.setTermsAccepted(activate);
+                break;
+            default:
+                throw new IllegalArgumentException("Consent '" + key + "' is not manageable here");
+        }
+        consentsRepository.save(consents);
+    }
+
+    /**
      * Get personal information for the authenticated investor.
      */
     @Transactional(readOnly = true)

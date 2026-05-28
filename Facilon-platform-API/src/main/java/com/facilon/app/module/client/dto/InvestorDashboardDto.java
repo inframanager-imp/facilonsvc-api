@@ -23,6 +23,12 @@ public class InvestorDashboardDto {
     private List<ApplicationItem> applications;
     private List<ConsentItem> consentCenter;
     private DelegationInfo delegation;
+    /**
+     * True once the investor has agreed to their Statement of Work (SOW submitted/approved and
+     * not revoked). The onboarding journey is gated on this — the journey page won't open until
+     * it's true. Surfaced here so the frontend route guard can block entry.
+     */
+    private Boolean sowAgreed;
 
     @Data
     @Builder
@@ -136,8 +142,10 @@ public class InvestorDashboardDto {
     public static class ConsentItem {
         private String consent;
         private String scope;
-        private String status;
+        private String status; // "Active" | "Inactive"
         private Boolean actionRequired;
+        private String action; // "ACTIVATE" | "UPDATE" | "REVOKE" | "NONE"
+        private String key;    // stable id for the action flow: "sow" | "marketing" | "whatsapp" | "privacy" | "platformTerms"
     }
 
     @Data

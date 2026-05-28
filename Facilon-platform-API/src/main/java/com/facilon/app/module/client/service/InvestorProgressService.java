@@ -56,6 +56,7 @@ public class InvestorProgressService {
         private final DynamicsCrmService dynamicsCrmService;
         private final InvestorServiceAgentDelegationRepository delegationRepository;
         private final ServiceAgentRepository serviceAgentRepository;
+        private final SowService sowService;
 
         public InvestorProgressDto getInvestorProgress(String uniqueCode) {
                 Investor investor = investorRepository.findByUniqueCode(uniqueCode)
@@ -353,7 +354,8 @@ public class InvestorProgressService {
                                                 : "KYC and onboarding submission are blocked until assignment is available.")
                                 .build();
                 List<InvestorDashboardDto.ApplicationItem> applications = buildApplications(onboardingEnabled);
-                List<InvestorDashboardDto.ConsentItem> consentCenter = buildConsentCenter(consents, introInvestor, onboardingEnabled);
+                boolean sowAgreed = sowService.hasAgreedSow(investor.getId());
+                List<InvestorDashboardDto.ConsentItem> consentCenter = buildConsentCenter(consents, sowAgreed);
                 // Look up the real service agent assigned to this investor via delegation table.
                 // Service Agent (person) ≠ Service Provider (broker firm).
                 List<InvestorServiceAgentDelegation> activeDelegations =
@@ -392,6 +394,7 @@ public class InvestorProgressService {
                                 .applications(applications)
                                 .consentCenter(consentCenter)
                                 .delegation(delegation)
+                                .sowAgreed(sowAgreed)
                                 .build();
         }
 
@@ -991,41 +994,44 @@ public class InvestorProgressService {
                 return apps;
         }
 
+        /**
+         * Builds the Consent Centre rows (the "My Consents" detail view). Each row carries an
+         * {@code action} (ACTIVATE/UPDATE/REVOKE) derived from its current status and a stable
+         * {@code key} the frontend uses to launch the right flow. SOW status comes from
+         * {@code sowAgreed}; the other rows reflect what was captured at registration in
+         * {@code investor_consents}.
+         */
         private List<InvestorDashboardDto.ConsentItem> buildConsentCenter(
-                        InvestorConsents consents,
-                        IntroInvestorTemp introInvestor,
-                        boolean onboardingEnabled) {
+                        InvestorConsents consents, boolean sowAgreed) {
+                boolean privacy = consents != null && Boolean.TRUE.equals(consents.getPrivacyPolicyAccepted());
+                boolean terms = consents != null && Boolean.TRUE.equals(consents.getTermsAccepted());
+                boolean marketing = consents != null && Boolean.TRUE.equals(consents.getMarketingConsent());
+                boolean whatsapp = consents != null && Boolean.TRUE.equals(consents.getWhatsappConsent());
+
                 List<InvestorDashboardDto.ConsentItem> items = new ArrayList<>();
-                items.add(InvestorDashboardDto.ConsentItem.builder()
-                                .consent("Platform Terms")
-                                .scope("Facilon")
-                                .status(toStatus(consents != null && Boolean.TRUE.equals(consents.getTermsAccepted())))
-                                .actionRequired(consents == null || !Boolean.TRUE.equals(consents.getTermsAccepted()))
-                                .build());
-                items.add(InvestorDashboardDto.ConsentItem.builder()
-                                .consent("Data Sharing")
-                                .scope(trimToNull(resolveServiceProviderDisplayName(
-                                                introInvestor != null ? introInvestor.getSsBrokerValue() : null,
-                                                introInvestor != null ? introInvestor.getServiceProviderType() : null))
-                                                != null
-                                                                ? resolveServiceProviderDisplayName(
-                                                                                introInvestor.getSsBrokerValue(),
-                                                                                introInvestor.getServiceProviderType())
-                                                                : "Service Provider")
-                                .status(onboardingEnabled ? "Active" : "Missing")
-                                .actionRequired(!onboardingEnabled)
-                                .build());
-                items.add(InvestorDashboardDto.ConsentItem.builder()
-                                .consent("Privacy Policy")
-                                .scope("Facilon")
-                                .status(toStatus(consents != null && Boolean.TRUE.equals(consents.getPrivacyPolicyAccepted())))
-                                .actionRequired(consents == null || !Boolean.TRUE.equals(consents.getPrivacyPolicyAccepted()))
-                                .build());
+                items.add(consentItem("privacy", "Privacy Consent", "Facilon", privacy,
+                                privacy ? "REVOKE" : "ACTIVATE"));
+                items.add(consentItem("platformTerms", "Platform Terms", "All Facilon Applications", terms,
+                                terms ? "REVOKE" : "ACTIVATE"));
+                items.add(consentItem("sow", "Statement of Work", "Facilon", sowAgreed,
+                                sowAgreed ? "REVOKE" : "ACTIVATE"));
+                items.add(consentItem("marketing", "Contact Details", "Marketing", marketing,
+                                marketing ? "REVOKE" : "ACTIVATE"));
+                items.add(consentItem("whatsapp", "Mobile number", "WhatsApp", whatsapp,
+                                whatsapp ? "REVOKE" : "ACTIVATE"));
                 return items;
         }
 
-        private String toStatus(boolean value) {
-                return value ? "Active" : "Missing";
+        private InvestorDashboardDto.ConsentItem consentItem(String key, String consent, String scope,
+                        boolean active, String action) {
+                return InvestorDashboardDto.ConsentItem.builder()
+                                .key(key)
+                                .consent(consent)
+                                .scope(scope)
+                                .status(active ? "Active" : "Inactive")
+                                .actionRequired(!active)
+                                .action(action)
+                                .build();
         }
 
         /** Returns the first non-blank value, or null if all are blank. */

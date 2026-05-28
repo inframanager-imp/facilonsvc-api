@@ -49,6 +49,17 @@ public class ClientProfileController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/consents/{key}/{action}")
+    @Operation(summary = "Activate or revoke a manageable consent (marketing / whatsapp)")
+    public ResponseEntity<Void> updateConsent(
+            @PathVariable String key,
+            @PathVariable String action,
+            Authentication auth) {
+        Long userId = ((UserPrincipal) auth.getPrincipal()).getId();
+        profileService.updateConsent(userId, key, action);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/passport")
     @Operation(summary = "Get passport details")
     public ResponseEntity<UserPassportDetailsDto> getPassport(Authentication auth) {

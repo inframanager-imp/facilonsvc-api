@@ -1,10 +1,14 @@
 package com.facilon.app.module.client.controller;
 
 import com.facilon.app.module.client.dto.*;
+import com.facilon.app.module.client.model.Investor;
+import com.facilon.app.module.client.repository.InvestorRepository;
 import com.facilon.app.module.client.service.SowService;
+import com.facilon.app.security.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -22,6 +26,61 @@ public class SowController {
 
     @Autowired
     private SowService sowService;
+
+    @Autowired
+    private InvestorRepository investorRepository;
+
+    /** Resolve the current authenticated investor's id. */
+    private Long currentInvestorId(Authentication auth) {
+        Long userId = ((UserPrincipal) auth.getPrincipal()).getId();
+        return investorRepository.findByAuthorizedUser_Id(userId)
+                .map(Investor::getId)
+                .orElseThrow(() -> new RuntimeException("Investor not found for current user"));
+    }
+
+    /** Whether the current investor has agreed to their SOW (drives the journey gate). */
+    @GetMapping("/me/agreed")
+    public ResponseEntity<?> myAgreed(Authentication auth) {
+        try {
+            boolean agreed = sowService.hasAgreedSow(currentInvestorId(auth));
+            return ResponseEntity.ok(Map.of("agreed", agreed));
+        } catch (Exception e) {
+            log.error("Error checking SOW agreement", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Record the current investor's agreement to the SOW. */
+    @PostMapping("/me/agree")
+    public ResponseEntity<?> myAgree(Authentication auth) {
+        try {
+            InvestorSowDto sow = sowService.recordAgreement(currentInvestorId(auth));
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Statement of Work agreed");
+            response.put("agreed", true);
+            response.put("sow", sow);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error recording SOW agreement", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Revoke the current investor's SOW agreement (re-closes the journey gate). */
+    @PostMapping("/me/revoke")
+    public ResponseEntity<?> myRevoke(Authentication auth) {
+        try {
+            InvestorSowDto sow = sowService.revokeAgreement(currentInvestorId(auth));
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Statement of Work revoked");
+            response.put("agreed", false);
+            response.put("sow", sow);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error revoking SOW agreement", e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     /**
      * Get active SOW template for investor type

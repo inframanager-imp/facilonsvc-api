@@ -192,6 +192,86 @@ public class SowService {
     }
 
     /**
+     * Whether the investor has agreed to a Statement of Work — i.e. has an InvestorSow in an
+     * agreed state ({@code submitted} or {@code approved}). A {@code draft}, {@code rejected},
+     * {@code revoked} or absent SOW counts as NOT agreed. Drives the onboarding-journey gate:
+     * the journey only opens once the investor has agreed, and a later revoke closes it again.
+     */
+    public boolean hasAgreedSow(Long investorId) {
+        if (investorId == null) {
+            return false;
+        }
+        return sowRepository.countByInvestorIdAndStatus(investorId, "submitted") > 0
+                || sowRepository.countByInvestorIdAndStatus(investorId, "approved") > 0;
+    }
+
+    /**
+     * Record the investor's agreement to their Statement of Work. Lightweight "I Agree" — creates
+     * (or reactivates) an InvestorSow in the {@code submitted} state, which is what the journey
+     * gate checks. Idempotent: if an agreed SOW already exists it's returned unchanged.
+     */
+    @Transactional
+    public InvestorSowDto recordAgreement(Long investorId) {
+        if (investorId == null) {
+            throw new RuntimeException("Investor not resolved");
+        }
+        // Already agreed → no-op.
+        Optional<InvestorSow> agreed = sowRepository.findByInvestorIdOrderByCreatedDateDesc(investorId)
+                .stream()
+                .filter(s -> "submitted".equals(s.getStatus()) || "approved".equals(s.getStatus()))
+                .findFirst();
+        if (agreed.isPresent()) {
+            return convertToSowDto(agreed.get());
+        }
+
+        // Reuse a revoked/rejected/draft row if present, else create fresh.
+        InvestorSow sow = sowRepository.findByInvestorIdOrderByCreatedDateDesc(investorId)
+                .stream().findFirst().orElseGet(InvestorSow::new);
+        sow.setInvestorId(investorId);
+        if (sow.getTemplateId() == null) {
+            templateRepository.findTopByApplicableForAndIsActiveTrueOrderByCreatedDateDesc("All")
+                    .ifPresent(t -> sow.setTemplateId(t.getId()));
+        }
+        if (sow.getSowData() == null) {
+            sow.setSowData("{\"agreed\":true}");
+        }
+        sow.setStatus("submitted");
+        sow.setSubmittedDate(LocalDateTime.now());
+        sow.setSignedDate(LocalDateTime.now());
+        sow.setRejectionReason(null);
+        if (sow.getDigitalSignature() == null) {
+            sow.setDigitalSignature("AGREED_VIA_CONSENT_CENTRE");
+        }
+        if (sow.getCreatedDate() == null) {
+            sow.setCreatedDate(LocalDateTime.now());
+        }
+        InvestorSow saved = sowRepository.save(sow);
+        log.info("Recorded SOW agreement for investor {}", investorId);
+        return convertToSowDto(saved);
+    }
+
+    /**
+     * Revoke the investor's SOW agreement — sets any agreed ({@code submitted}/{@code approved})
+     * SOW to {@code revoked}, which re-closes the onboarding-journey gate.
+     */
+    @Transactional
+    public InvestorSowDto revokeAgreement(Long investorId) {
+        if (investorId == null) {
+            throw new RuntimeException("Investor not resolved");
+        }
+        InvestorSow agreed = sowRepository.findByInvestorIdOrderByCreatedDateDesc(investorId)
+                .stream()
+                .filter(s -> "submitted".equals(s.getStatus()) || "approved".equals(s.getStatus()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No agreed SOW to revoke"));
+        agreed.setStatus("revoked");
+        agreed.setUpdatedDate(LocalDateTime.now());
+        InvestorSow saved = sowRepository.save(agreed);
+        log.info("Revoked SOW agreement for investor {}", investorId);
+        return convertToSowDto(saved);
+    }
+
+    /**
      * Get SOW data for PDF generation
      */
     public Map<String, Object> getSowDataForPdf(Long sowId) {
