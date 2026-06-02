@@ -36,4 +36,54 @@
         </sql>
     </changeSet>
 
+    <!-- Phase 1 (V1): new module columns + Auditable columns (created_by/modified_by/modified_at). -->
+    <changeSet id="dsr-2-extend-dsr-cases" author="facilon">
+        <sql>
+            ALTER TABLE dsr_cases
+                ADD COLUMN data_area VARCHAR(512) NULL,
+                ADD COLUMN sp_relation_flag VARCHAR(32) NULL,
+                ADD COLUMN evidence_folder_path VARCHAR(512) NULL,
+                ADD COLUMN verification_status VARCHAR(32) NULL,
+                ADD COLUMN verification_method VARCHAR(64) NULL,
+                ADD COLUMN decision VARCHAR(32) NULL,
+                ADD COLUMN final_outcome VARCHAR(255) NULL,
+                ADD COLUMN created_by VARCHAR(255) NULL,
+                ADD COLUMN modified_by VARCHAR(255) NULL,
+                ADD COLUMN modified_at TIMESTAMP NULL;
+        </sql>
+    </changeSet>
+
+    <!-- Audit / investor timeline events. -->
+    <changeSet id="dsr-3-create-dsr-case-events" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS dsr_case_events (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                dsr_case_id BIGINT NOT NULL,
+                case_id VARCHAR(64) NOT NULL,
+                event_code VARCHAR(64) NOT NULL,
+                actor VARCHAR(255),
+                actor_role VARCHAR(64),
+                from_status VARCHAR(64),
+                to_status VARCHAR(64),
+                note TEXT,
+                investor_visible TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_dsr_events_case FOREIGN KEY (dsr_case_id) REFERENCES dsr_cases(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX idx_dsr_events_case ON dsr_case_events(dsr_case_id);
+            CREATE INDEX idx_dsr_events_case_visible ON dsr_case_events(dsr_case_id, investor_visible);
+        </sql>
+    </changeSet>
+
+    <!-- Per-year sequential Case ID counter (DSR-YYYY-000001). -->
+    <changeSet id="dsr-4-create-dsr-case-sequence" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS dsr_case_sequence (
+                seq_year INT PRIMARY KEY,
+                last_seq BIGINT NOT NULL
+            );
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>

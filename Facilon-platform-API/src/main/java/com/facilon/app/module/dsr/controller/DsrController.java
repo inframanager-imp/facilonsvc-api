@@ -1,12 +1,13 @@
-package com.facilon.app.module.client.controller;
+package com.facilon.app.module.dsr.controller;
 
 import com.facilon.app.annotations.CurrentTenant;
-import com.facilon.app.module.client.dto.DsrCaseCreateRequestDto;
-import com.facilon.app.module.client.dto.DsrCaseResponseDto;
 import com.facilon.app.module.client.dto.InvestorDto;
-import com.facilon.app.module.client.model.DsrCase;
 import com.facilon.app.module.client.service.ClientService;
-import com.facilon.app.module.client.service.DsrService;
+import com.facilon.app.module.dsr.dto.DsrCaseCreateRequestDto;
+import com.facilon.app.module.dsr.dto.DsrCaseDetailDto;
+import com.facilon.app.module.dsr.dto.DsrCaseResponseDto;
+import com.facilon.app.module.dsr.model.DsrCase;
+import com.facilon.app.module.dsr.service.DsrService;
 import com.facilon.app.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,13 +23,17 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Investor-facing DSR endpoints. Path retained as {@code /api/clients/me/dsr} for
+ * frontend compatibility while the implementation lives in the self-contained dsr module.
+ */
 @RestController
 @RequestMapping("/api/clients/me/dsr")
 @RequiredArgsConstructor
 @Slf4j
 @CurrentTenant
 @Tag(name = "Client DSR", description = "Data Subject Rights APIs for investors")
-public class ClientDsrController {
+public class DsrController {
 
     private final DsrService dsrService;
     private final ClientService clientService;
@@ -38,6 +43,7 @@ public class ClientDsrController {
     public ResponseEntity<DsrCaseResponseDto> submitCase(
             @RequestParam String requestType,
             @RequestParam String jurisdiction,
+            @RequestParam(required = false) String dataArea,
             @RequestParam String requestDescription,
             @RequestParam String requesterName,
             @RequestParam String requesterEmail,
@@ -50,13 +56,15 @@ public class ClientDsrController {
             DsrCaseCreateRequestDto dto = DsrCaseCreateRequestDto.builder()
                     .requestType(requestType)
                     .jurisdiction(jurisdiction)
+                    .dataArea(dataArea)
                     .requestDescription(requestDescription)
                     .requesterName(requesterName)
                     .requesterEmail(requesterEmail)
                     .requesterPhone(requesterPhone)
                     .requesterRole(requesterRole)
                     .build();
-            return ResponseEntity.status(HttpStatus.CREATED).body(dsrService.submitCase(uniqueCode, dto, supportingFile));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(dsrService.submitCase(uniqueCode, dto, supportingFile));
         } catch (RuntimeException e) {
             log.error("Error submitting DSR case: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
@@ -76,11 +84,13 @@ public class ClientDsrController {
     }
 
     @GetMapping("/{caseId}")
-    @Operation(summary = "Get my DSR case by Case ID", description = "Get single DSR case for current investor")
-    public ResponseEntity<DsrCaseResponseDto> getMyCase(@PathVariable String caseId, Authentication authentication) {
+    @Operation(summary = "Get my DSR case by Case ID", description = "Case detail with investor-visible timeline")
+    public ResponseEntity<DsrCaseDetailDto> getMyCase(@PathVariable String caseId, Authentication authentication) {
         try {
             String uniqueCode = getCurrentInvestorUniqueCode(authentication);
-            return ResponseEntity.ok(dsrService.getCaseForInvestor(uniqueCode, caseId));
+            return ResponseEntity.ok(dsrService.getCaseDetailForInvestor(uniqueCode, caseId));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (RuntimeException e) {
             log.error("Error fetching DSR case {}: {}", caseId, e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -90,15 +100,13 @@ public class ClientDsrController {
     @GetMapping("/request-types")
     @Operation(summary = "List DSR request types")
     public ResponseEntity<List<String>> getRequestTypes() {
-        List<String> types = Arrays.stream(DsrCase.RequestType.values()).map(Enum::name).toList();
-        return ResponseEntity.ok(types);
+        return ResponseEntity.ok(Arrays.stream(DsrCase.RequestType.values()).map(Enum::name).toList());
     }
 
     @GetMapping("/jurisdictions")
     @Operation(summary = "List DSR jurisdictions")
     public ResponseEntity<List<String>> getJurisdictions() {
-        List<String> jurisdictions = Arrays.stream(DsrCase.Jurisdiction.values()).map(Enum::name).toList();
-        return ResponseEntity.ok(jurisdictions);
+        return ResponseEntity.ok(Arrays.stream(DsrCase.Jurisdiction.values()).map(Enum::name).toList());
     }
 
     private String getCurrentInvestorUniqueCode(Authentication authentication) {

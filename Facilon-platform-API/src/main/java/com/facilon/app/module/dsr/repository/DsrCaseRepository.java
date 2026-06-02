@@ -1,6 +1,6 @@
-package com.facilon.app.module.client.repository;
+package com.facilon.app.module.dsr.repository;
 
-import com.facilon.app.module.client.model.DsrCase;
+import com.facilon.app.module.dsr.model.DsrCase;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +16,9 @@ public interface DsrCaseRepository extends JpaRepository<DsrCase, Long> {
     List<DsrCase> findByInvestorUniqueCodeOrderByCreatedAtDesc(String investorUniqueCode);
 
     List<DsrCase> findByStatusAndSlaDeadlineBefore(DsrCase.CaseStatus status, LocalDateTime deadline);
+
+    /** Admin queue - tenant-scoped automatically via the Hibernate tenant filter. */
+    List<DsrCase> findAllByOrderByCreatedAtDesc();
 
     boolean existsByCaseId(String caseId);
 }

@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Admin Documents", description = "Admin document verification and management")
-@PreAuthorize("hasRole('ADMIN')")
+ 
 public class AdminDocumentController {
 
     private final ClientDocumentService documentService;

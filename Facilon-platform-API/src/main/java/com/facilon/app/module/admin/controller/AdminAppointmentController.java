@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Admin Appointments", description = "Admin appointment management")
-@PreAuthorize("hasRole('ADMIN')")
 public class AdminAppointmentController {
 
     private final AppointmentService appointmentService;
