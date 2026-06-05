@@ -204,6 +204,10 @@ public class DsrService {
             log.error("Failed sending requester DSR acknowledgment for case {}", dsrCase.getCaseId(), e);
         }
 
+        // TODO(UAT): Privacy Ops notification to privacyEmail (privacy@facilonservices.com) is
+        // disabled for now. Re-enable this block during UAT testing so new DSR requests notify
+        // the Privacy Ops inbox.
+        /*
         try {
             String opsSubject = "DSR Request - " + dsrCase.getJurisdiction().name() + " - "
                     + dsrCase.getRequestType().name() + " - " + dsrCase.getCaseId();
@@ -219,6 +223,7 @@ public class DsrService {
         } catch (Exception e) {
             log.error("Failed sending Privacy Ops DSR notification for case {}", dsrCase.getCaseId(), e);
         }
+        */
     }
 
     private DsrCaseResponseDto toResponse(DsrCase dsrCase) {
