@@ -39,6 +39,7 @@ public class DsrAdminUserController {
 
     @GetMapping("/me")
     @Operation(summary = "Profile of the logged-in admin (dashboard welcome banner)")
+    @PreAuthorize("hasAnyAuthority('ADMIN','PLATFORM_SUPER_ADMIN','DSR_ADMIN')")
     public ResponseEntity<DsrAdminUserDto> me(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
