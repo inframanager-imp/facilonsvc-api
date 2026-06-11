@@ -2,6 +2,7 @@ package com.facilon.app.module.dsr.controller;
 
 import com.facilon.app.module.dsr.dto.DsrAdminCaseDto;
 import com.facilon.app.module.dsr.dto.DsrAdminUpdateRequestDto;
+import com.facilon.app.module.dsr.dto.DsrCasePageDto;
 import com.facilon.app.module.dsr.dto.DsrDashboardSummaryDto;
 import com.facilon.app.module.dsr.dto.DsrEvidenceFileDto;
 import com.facilon.app.module.dsr.dto.DsrFilePayload;
@@ -34,7 +35,7 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Admin DSR", description = "Privacy Ops / Admin DSR resolution console")
-@PreAuthorize("hasAnyAuthority('ADMIN','PLATFORM_SUPER_ADMIN')")
+@PreAuthorize("hasAnyAuthority('ADMIN','PLATFORM_SUPER_ADMIN','DSR_ADMIN')")
 public class AdminDsrController {
 
     private final AdminDsrService adminDsrService;
@@ -46,9 +47,25 @@ public class AdminDsrController {
             @RequestParam(required = false) String requestType,
             @RequestParam(required = false) String jurisdiction,
             @RequestParam(required = false) Boolean overdueOnly,
-            @RequestParam(required = false) String assignedTo) {
+            @RequestParam(required = false) String assignedTo,
+            @RequestParam(required = false) String bucket) {
         return ResponseEntity.ok(
-                adminDsrService.listCases(status, requestType, jurisdiction, overdueOnly, assignedTo));
+                adminDsrService.listCases(status, requestType, jurisdiction, overdueOnly, assignedTo, bucket));
+    }
+
+    @GetMapping("/paged")
+    @Operation(summary = "List DSR cases with server-side pagination and optional filters")
+    public ResponseEntity<DsrCasePageDto> listPaged(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String requestType,
+            @RequestParam(required = false) String jurisdiction,
+            @RequestParam(required = false) Boolean overdueOnly,
+            @RequestParam(required = false) String assignedTo,
+            @RequestParam(required = false) String bucket,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(
+                adminDsrService.listCasesPaged(status, requestType, jurisdiction, overdueOnly, assignedTo, bucket, page, size));
     }
 
     @GetMapping("/dashboard")

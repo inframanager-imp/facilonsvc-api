@@ -2,6 +2,7 @@ package com.facilon.app.module.dsr.service;
 
 import com.facilon.app.module.dsr.dto.DsrAdminCaseDto;
 import com.facilon.app.module.dsr.dto.DsrAdminUpdateRequestDto;
+import com.facilon.app.module.dsr.dto.DsrCasePageDto;
 import com.facilon.app.module.dsr.dto.DsrDashboardSummaryDto;
 import com.facilon.app.module.dsr.dto.DsrEvidenceFileDto;
 import com.facilon.app.module.dsr.dto.DsrFilePayload;
@@ -54,10 +55,23 @@ public class AdminDsrService {
 
     // ----- read ----------------------------------------------------------------
 
+    /**
+     * Dashboard triage buckets. Every open case lands in exactly one bucket
+     * (first-match-wins waterfall), so the four always sum to the open total.
+     */
+    public enum TriageBucket { OVERDUE, NEW_TODAY, NOT_WORKED, WITHIN_TAT }
+
     @Transactional(readOnly = true)
     public List<DsrAdminCaseDto> listCases(String status, String requestType, String jurisdiction,
                                            Boolean overdueOnly, String assignedTo) {
+        return listCases(status, requestType, jurisdiction, overdueOnly, assignedTo, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DsrAdminCaseDto> listCases(String status, String requestType, String jurisdiction,
+                                           Boolean overdueOnly, String assignedTo, String bucket) {
         LocalDateTime now = LocalDateTime.now();
+        TriageBucket wanted = parseBucket(bucket);
         return dsrCaseRepository.findAllByOrderByCreatedAtDesc().stream()
                 .filter(c -> status == null || status.isBlank()
                         || (c.getStatus() != null && c.getStatus().name().equalsIgnoreCase(status)))
@@ -68,8 +82,31 @@ public class AdminDsrService {
                 .filter(c -> assignedTo == null || assignedTo.isBlank()
                         || assignedTo.equalsIgnoreCase(c.getAssignedTo()))
                 .filter(c -> !Boolean.TRUE.equals(overdueOnly) || isOverdue(c, now))
+                .filter(c -> wanted == null || bucketOf(c, now) == wanted)
                 .map(c -> toAdminDto(c, false))
                 .toList();
+    }
+
+    /** Server-side paginated queue. Reuses the same filters as {@link #listCases}. */
+    @Transactional(readOnly = true)
+    public DsrCasePageDto listCasesPaged(String status, String requestType, String jurisdiction,
+                                         Boolean overdueOnly, String assignedTo, String bucket,
+                                         int page, int size) {
+        List<DsrAdminCaseDto> all = listCases(status, requestType, jurisdiction, overdueOnly, assignedTo, bucket);
+        int safeSize = size <= 0 ? 10 : size;
+        int safePage = Math.max(0, page);
+        int total = all.size();
+        int from = Math.min(safePage * safeSize, total);
+        int to = Math.min(from + safeSize, total);
+        List<DsrAdminCaseDto> content = from >= to ? List.of() : all.subList(from, to);
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+        return DsrCasePageDto.builder()
+                .content(content)
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -84,7 +121,10 @@ public class AdminDsrService {
         YearMonth thisMonth = YearMonth.now();
 
         long open = all.stream().filter(this::isOpen).count();
-        long overdue = all.stream().filter(c -> isOverdue(c, now)).count();
+        long overdue = all.stream().filter(c -> bucketOf(c, now) == TriageBucket.OVERDUE).count();
+        long newToday = all.stream().filter(c -> bucketOf(c, now) == TriageBucket.NEW_TODAY).count();
+        long notWorked = all.stream().filter(c -> bucketOf(c, now) == TriageBucket.NOT_WORKED).count();
+        long withinTat = all.stream().filter(c -> bucketOf(c, now) == TriageBucket.WITHIN_TAT).count();
         long awaitingVerification = all.stream()
                 .filter(c -> c.getStatus() == DsrCase.CaseStatus.VERIFICATION_PENDING).count();
         long closedThisMonth = all.stream()
@@ -106,6 +146,9 @@ public class AdminDsrService {
                 .total(all.size())
                 .open(open)
                 .overdue(overdue)
+                .newToday(newToday)
+                .notWorked(notWorked)
+                .withinTat(withinTat)
                 .awaitingVerification(awaitingVerification)
                 .closedThisMonth(closedThisMonth)
                 .byRequestType(byType)
@@ -294,6 +337,40 @@ public class AdminDsrService {
     private boolean isOpen(DsrCase c) {
         return c.getStatus() != DsrCase.CaseStatus.CLOSED
                 && c.getStatus() != DsrCase.CaseStatus.REJECTED;
+    }
+
+    private TriageBucket parseBucket(String bucket) {
+        if (bucket == null || bucket.isBlank()) {
+            return null;
+        }
+        try {
+            return TriageBucket.valueOf(bucket.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid bucket '" + bucket
+                    + "' - expected one of OVERDUE, NEW_TODAY, NOT_WORKED, WITHIN_TAT");
+        }
+    }
+
+    /** Untouched = still in its initial post-submission status, nobody has acted on it. */
+    private boolean isUntouched(DsrCase c) {
+        return c.getStatus() == DsrCase.CaseStatus.NEW
+                || c.getStatus() == DsrCase.CaseStatus.SUBMITTED;
+    }
+
+    /** First-match-wins triage classification; null for closed/rejected cases. */
+    private TriageBucket bucketOf(DsrCase c, LocalDateTime now) {
+        if (!isOpen(c)) {
+            return null;
+        }
+        if (isOverdue(c, now)) {
+            return TriageBucket.OVERDUE;
+        }
+        boolean createdToday = c.getCreatedAt() != null
+                && c.getCreatedAt().toLocalDate().equals(now.toLocalDate());
+        if (isUntouched(c)) {
+            return createdToday ? TriageBucket.NEW_TODAY : TriageBucket.NOT_WORKED;
+        }
+        return TriageBucket.WITHIN_TAT;
     }
 
     private boolean isOverdue(DsrCase c, LocalDateTime now) {

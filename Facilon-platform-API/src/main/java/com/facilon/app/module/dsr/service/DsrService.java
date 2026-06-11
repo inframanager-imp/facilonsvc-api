@@ -8,6 +8,7 @@ import com.facilon.app.module.dsr.dto.DsrCaseResponseDto;
 import com.facilon.app.module.dsr.model.DsrCase;
 import com.facilon.app.module.dsr.repository.DsrCaseRepository;
 import com.facilon.app.service.EmailService;
+import com.facilon.app.util.EmailTemplateLoader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
@@ -40,6 +42,7 @@ public class DsrService {
     private final DsrPdfService pdfService;
     private final DsrStatusMapper statusMapper;
     private final DsrEventService eventService;
+    private final EmailTemplateLoader emailTemplateLoader;
 
     @Value("${app.client_url:http://localhost:3000}")
     private String clientUrl;
@@ -50,7 +53,7 @@ public class DsrService {
     public DsrCaseResponseDto submitCase(
             String investorUniqueCode,
             DsrCaseCreateRequestDto dto,
-            MultipartFile supportingFile) {
+            MultipartFile[] supportingFiles) {
 
         Investor investor = investorRepository.findByUniqueCode(investorUniqueCode)
                 .orElseThrow(() -> new NoSuchElementException("Investor not found"));
@@ -61,7 +64,7 @@ public class DsrService {
         String caseId = caseIdGenerator.nextCaseId();
         LocalDateTime slaDeadline = calculateSlaDeadline(jurisdiction);
         String evidenceFolder = evidenceService.createCaseFolder(caseId);
-        String supportingFilePath = saveSupportingFile(caseId, supportingFile);
+        String supportingFilePath = saveSupportingFiles(caseId, supportingFiles);
 
         DsrCase dsrCase = DsrCase.builder()
                 .caseId(caseId)
@@ -148,20 +151,42 @@ public class DsrService {
         };
     }
 
-    private String saveSupportingFile(String caseId, MultipartFile file) {
-        if (file == null || file.isEmpty()) {
+    private static final int MAX_SUPPORTING_FILES = 10;
+
+    /**
+     * Stores all uploaded supporting documents into {@code 01_Request} and returns the path of
+     * the first one (kept on {@code supportingFilePath} for the legacy single-download button;
+     * every file is also visible in the admin Evidence Files panel).
+     */
+    private String saveSupportingFiles(String caseId, MultipartFile[] files) {
+        if (files == null || files.length == 0) {
             return null;
         }
-        String originalName = file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename();
-        String ext = evidenceService.getExtension(originalName);
-        if (!ext.equals("pdf") && !ext.equals("jpg") && !ext.equals("jpeg")) {
-            throw new IllegalArgumentException("Only PDF/JPG/JPEG files are allowed");
+        if (files.length > MAX_SUPPORTING_FILES) {
+            throw new IllegalArgumentException("A maximum of " + MAX_SUPPORTING_FILES + " supporting files is allowed");
         }
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new IllegalArgumentException("Supporting file must be <= 5MB");
+        String firstPath = null;
+        int index = 0;
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+            String originalName = file.getOriginalFilename() == null ? "attachment" : file.getOriginalFilename();
+            String ext = evidenceService.getExtension(originalName);
+            if (!ext.equals("pdf") && !ext.equals("jpg") && !ext.equals("jpeg")) {
+                throw new IllegalArgumentException("Only PDF/JPG/JPEG files are allowed");
+            }
+            if (file.getSize() > 5 * 1024 * 1024) {
+                throw new IllegalArgumentException("Each supporting file must be <= 5MB");
+            }
+            index++;
+            String storedName = "supporting-evidence-" + index + "-" + originalName;
+            String path = evidenceService.storeFile(caseId, DsrEvidenceService.SUB_REQUEST, storedName, file);
+            if (firstPath == null) {
+                firstPath = path;
+            }
         }
-        return evidenceService.storeFile(caseId, DsrEvidenceService.SUB_REQUEST,
-                "supporting-evidence." + ext, file);
+        return firstPath;
     }
 
     /**
@@ -187,18 +212,31 @@ public class DsrService {
         }
     }
 
+    private static final String TEMPLATE_DSR_ACKNOWLEDGMENT = "32-dsr-acknowledgment.html";
+    private static final String TEMPLATE_DSR_PRIVACY_OPS = "33-dsr-privacy-ops-notification.html";
+
+    /** Template variables shared by both DSR submission emails. Values are HTML-escaped here
+     *  because {@link EmailTemplateLoader} does plain replacement without escaping. */
+    private Map<String, String> dsrTemplateVariables(DsrCase dsrCase) {
+        return Map.of(
+                "caseId", safe(dsrCase.getCaseId()),
+                "investorCode", safe(dsrCase.getInvestorUniqueCode()),
+                "requesterName", safe(dsrCase.getRequesterName()),
+                "requesterEmail", safe(dsrCase.getRequesterEmail()),
+                "requestType", safe(dsrCase.getRequestType().name()),
+                "jurisdiction", safe(dsrCase.getJurisdiction().name()),
+                "submittedAt", formatDate(dsrCase.getCreatedAt() != null ? dsrCase.getCreatedAt() : LocalDateTime.now()),
+                "slaDeadline", formatDate(dsrCase.getSlaDeadline()),
+                "requestDescription", safe(dsrCase.getRequestDescription()),
+                "baseUrl", clientUrl
+        );
+    }
+
     private void sendSubmissionNotifications(DsrCase dsrCase) {
         try {
             String requesterSubject = "Your DSR Request [" + dsrCase.getCaseId() + "] - Acknowledgment";
-            String requesterBody = "<p>Dear " + safe(dsrCase.getRequesterName()) + ",</p>"
-                    + "<p>Your Data Subject Rights request has been received.</p>"
-                    + "<p><strong>Case ID:</strong> " + safe(dsrCase.getCaseId()) + "<br/>"
-                    + "<strong>Right:</strong> " + safe(dsrCase.getRequestType().name()) + "<br/>"
-                    + "<strong>Jurisdiction:</strong> " + safe(dsrCase.getJurisdiction().name()) + "<br/>"
-                    + "<strong>Submitted At:</strong> " + formatDate(dsrCase.getCreatedAt()) + "<br/>"
-                    + "<strong>SLA Deadline:</strong> " + formatDate(dsrCase.getSlaDeadline()) + "</p>"
-                    + "<p>Our Privacy Ops team will follow up within 48 hours.</p>"
-                    + "<p>You can track updates after login: <a href=\"" + clientUrl + "/investor/dsr-center\">DSR Center</a></p>";
+            String requesterBody = emailTemplateLoader.processTemplate(
+                    TEMPLATE_DSR_ACKNOWLEDGMENT, dsrTemplateVariables(dsrCase));
             emailService.sendHtmlMessage(dsrCase.getRequesterEmail(), requesterSubject, requesterBody);
         } catch (Exception e) {
             log.error("Failed sending requester DSR acknowledgment for case {}", dsrCase.getCaseId(), e);
@@ -206,19 +244,14 @@ public class DsrService {
 
         // TODO(UAT): Privacy Ops notification to privacyEmail (privacy@facilonservices.com) is
         // disabled for now. Re-enable this block during UAT testing so new DSR requests notify
-        // the Privacy Ops inbox.
+        // the Privacy Ops inbox. Uses template 33-dsr-privacy-ops-notification.html (includes
+        // the DSR description).
         /*
         try {
             String opsSubject = "DSR Request - " + dsrCase.getJurisdiction().name() + " - "
                     + dsrCase.getRequestType().name() + " - " + dsrCase.getCaseId();
-            String opsBody = "<p>New DSR request received.</p>"
-                    + "<p><strong>Case ID:</strong> " + safe(dsrCase.getCaseId()) + "<br/>"
-                    + "<strong>Investor Code:</strong> " + safe(dsrCase.getInvestorUniqueCode()) + "<br/>"
-                    + "<strong>Requester:</strong> " + safe(dsrCase.getRequesterName()) + " (" + safe(dsrCase.getRequesterEmail()) + ")<br/>"
-                    + "<strong>Jurisdiction:</strong> " + safe(dsrCase.getJurisdiction().name()) + "<br/>"
-                    + "<strong>Right:</strong> " + safe(dsrCase.getRequestType().name()) + "<br/>"
-                    + "<strong>SLA Deadline:</strong> " + formatDate(dsrCase.getSlaDeadline()) + "</p>"
-                    + "<p><strong>Description:</strong><br/>" + safe(dsrCase.getRequestDescription()) + "</p>";
+            String opsBody = emailTemplateLoader.processTemplate(
+                    TEMPLATE_DSR_PRIVACY_OPS, dsrTemplateVariables(dsrCase));
             emailService.sendHtmlMessage(privacyEmail, opsSubject, opsBody);
         } catch (Exception e) {
             log.error("Failed sending Privacy Ops DSR notification for case {}", dsrCase.getCaseId(), e);

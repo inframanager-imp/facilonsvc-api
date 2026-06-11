@@ -51,6 +51,7 @@ public class DsrCase extends TenantEntity {
      * (ROUTED_TO_SP / CONTROLLER_ASSESSMENT_PENDING) are intentionally omitted this phase.
      */
     public enum CaseStatus {
+        NEW,
         SUBMITTED,
         ACKNOWLEDGED,
         VERIFICATION_PENDING,

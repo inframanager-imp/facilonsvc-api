@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New DSR Request Received</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #b54708 0%, #f79009 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .info-box {background-color: #fff8eb; border-left: 4px solid #f79009; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .description-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 20px 0; border-radius: 4px; white-space: pre-wrap;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⚠️ New DSR Request</h1>
+            <p style="margin: 10px 0; font-size: 18px;">Privacy Ops Action Required</p>
+        </div>
+        <div class="content">
+            <p>A new Data Subject Rights request has been received and is awaiting triage.</p>
+
+            <div class="info-box">
+                <h3>📋 Case Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Case ID:</strong></td>
+                        <td style="padding: 5px 0;">{{caseId}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Investor Code:</strong></td>
+                        <td style="padding: 5px 0;">{{investorCode}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Requester:</strong></td>
+                        <td style="padding: 5px 0;">{{requesterName}} ({{requesterEmail}})</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Jurisdiction:</strong></td>
+                        <td style="padding: 5px 0;">{{jurisdiction}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Right:</strong></td>
+                        <td style="padding: 5px 0;">{{requestType}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Submitted At:</strong></td>
+                        <td style="padding: 5px 0;">{{submittedAt}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>SLA Deadline:</strong></td>
+                        <td style="padding: 5px 0;">{{slaDeadline}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="description-box">
+                <h4 style="margin-top: 0;">📝 Request Description:</h4>
+                <p style="margin-bottom: 0;">{{requestDescription}}</p>
+            </div>
+
+            <p>Open the case in the Admin Center to acknowledge and assign it.</p>
+        </div>
+        <div class="footer">
+            <p>Automated notification from the Facilon DSR module. Case reference: {{caseId}}.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

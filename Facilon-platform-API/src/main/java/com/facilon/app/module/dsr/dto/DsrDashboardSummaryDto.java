@@ -16,7 +16,14 @@ public class DsrDashboardSummaryDto {
 
     private long total;
     private long open;
+    /** Open + past SLA deadline (triage bucket 1). */
     private long overdue;
+    /** Open, untouched, created today (triage bucket 2). */
+    private long newToday;
+    /** Open, untouched, created before today (triage bucket 3). */
+    private long notWorked;
+    /** Open, on time, being worked (triage bucket 4). overdue + newToday + notWorked + withinTat = open. */
+    private long withinTat;
     private long awaitingVerification;
     private long closedThisMonth;
     /** Count keyed by request type code. */

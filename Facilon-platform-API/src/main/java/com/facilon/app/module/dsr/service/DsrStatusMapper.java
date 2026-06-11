@@ -17,6 +17,7 @@ public class DsrStatusMapper {
             return "Submitted";
         }
         return switch (status) {
+            case NEW -> "Submitted";
             case SUBMITTED -> "Submitted";
             case ACKNOWLEDGED -> "Received";
             case VERIFICATION_PENDING -> "Verification Required";
@@ -38,6 +39,7 @@ public class DsrStatusMapper {
             return "Submitted";
         }
         return switch (status) {
+            case NEW -> "Submitted";
             case SUBMITTED -> "Submitted";
             case ACKNOWLEDGED -> "Received by Facilon";
             case VERIFICATION_PENDING -> "Verification Required";

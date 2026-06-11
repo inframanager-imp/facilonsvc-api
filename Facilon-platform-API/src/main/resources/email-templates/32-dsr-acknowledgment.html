@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSR Request Acknowledgment</title>
+    <style>
+        body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;}
+        .email-container {max-width: 700px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .header {background: linear-gradient(135deg, #175cd3 0%, #2196F3 100%); color: #ffffff; padding: 30px; text-align: center;}
+        .header h1 {margin: 0; font-size: 26px;}
+        .content {padding: 30px;}
+        .info-box {background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 20px; margin: 20px 0; border-radius: 4px;}
+        .description-box {background-color: #f8f9fa; border-left: 4px solid #6c757d; padding: 20px; margin: 20px 0; border-radius: 4px; white-space: pre-wrap;}
+        .button {display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #175cd3 0%, #2196F3 100%); color: #ffffff; text-decoration: none; border-radius: 25px; font-weight: bold; margin: 10px 5px;}
+        .footer {background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #dee2e6;}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>Data Subject Rights Request</h1>
+            <p style="margin: 10px 0; font-size: 18px;">Acknowledgment</p>
+        </div>
+        <div class="content">
+            <p>Dear <strong>{{requesterName}}</strong>,</p>
+
+            <p>Your Data Subject Rights request has been received.</p>
+
+            <div class="info-box">
+                <h3>📋 Request Details:</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Case ID:</strong></td>
+                        <td style="padding: 5px 0;">{{caseId}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Right:</strong></td>
+                        <td style="padding: 5px 0;">{{requestType}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Jurisdiction:</strong></td>
+                        <td style="padding: 5px 0;">{{jurisdiction}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>Submitted At:</strong></td>
+                        <td style="padding: 5px 0;">{{submittedAt}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;"><strong>SLA Deadline:</strong></td>
+                        <td style="padding: 5px 0;">{{slaDeadline}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="description-box">
+                <h4 style="margin-top: 0;">📝 Your Request Description:</h4>
+                <p style="margin-bottom: 0;">{{requestDescription}}</p>
+            </div>
+
+            <p>Our Privacy Ops team will follow up within 48 hours.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{baseUrl}}/investor/dsr-center" class="button">Track Your Request</a>
+            </div>
+
+            <p>You can track updates anytime in the <a href="{{baseUrl}}/investor/dsr-center">Privacy &amp; Data Rights Centre</a> after login.</p>
+
+            <p>Regards,<br>
+            <strong>Privacy Team</strong><br>
+            Facilon Services Private Limited</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated email. Your case reference is {{caseId}}.</p>
+            <p>&copy; 2026 Facilon Platform. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

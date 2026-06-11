@@ -49,7 +49,7 @@ public class DsrController {
             @RequestParam String requesterEmail,
             @RequestParam(required = false) String requesterPhone,
             @RequestParam(required = false) String requesterRole,
-            @RequestPart(value = "supportingFile", required = false) MultipartFile supportingFile,
+            @RequestPart(value = "supportingFiles", required = false) MultipartFile[] supportingFiles,
             Authentication authentication) {
         try {
             String uniqueCode = getCurrentInvestorUniqueCode(authentication);
@@ -64,7 +64,7 @@ public class DsrController {
                     .requesterRole(requesterRole)
                     .build();
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(dsrService.submitCase(uniqueCode, dto, supportingFile));
+                    .body(dsrService.submitCase(uniqueCode, dto, supportingFiles));
         } catch (RuntimeException e) {
             log.error("Error submitting DSR case: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().build();
