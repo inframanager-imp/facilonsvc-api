@@ -215,6 +215,10 @@ public class DsrService {
     private static final String TEMPLATE_DSR_ACKNOWLEDGMENT = "32-dsr-acknowledgment.html";
     private static final String TEMPLATE_DSR_PRIVACY_OPS = "33-dsr-privacy-ops-notification.html";
 
+    /** Date-only display format for emails, e.g. {@code 04-Jun-2026}. */
+    private static final DateTimeFormatter EMAIL_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.ENGLISH);
+
     /** Template variables shared by both DSR submission emails. Values are HTML-escaped here
      *  because {@link EmailTemplateLoader} does plain replacement without escaping. */
     private Map<String, String> dsrTemplateVariables(DsrCase dsrCase) {
@@ -225,11 +229,15 @@ public class DsrService {
                 "requesterEmail", safe(dsrCase.getRequesterEmail()),
                 "requestType", safe(dsrCase.getRequestType().name()),
                 "jurisdiction", safe(dsrCase.getJurisdiction().name()),
-                "submittedAt", formatDate(dsrCase.getCreatedAt() != null ? dsrCase.getCreatedAt() : LocalDateTime.now()),
-                "slaDeadline", formatDate(dsrCase.getSlaDeadline()),
+                "submittedAt", formatEmailDate(dsrCase.getCreatedAt() != null ? dsrCase.getCreatedAt() : LocalDateTime.now()),
+                "slaDeadline", formatEmailDate(dsrCase.getSlaDeadline()),
                 "requestDescription", safe(dsrCase.getRequestDescription()),
                 "baseUrl", clientUrl
         );
+    }
+
+    private String formatEmailDate(LocalDateTime value) {
+        return value == null ? "" : value.format(EMAIL_DATE_FORMAT);
     }
 
     private void sendSubmissionNotifications(DsrCase dsrCase) {
