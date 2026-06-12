@@ -7,7 +7,9 @@ import lombok.NoArgsConstructor;
 
 /**
  * Registration payload for a new DSR Admin user. The DSR_ADMIN role is assigned
- * automatically - it is not part of the payload.
+ * automatically - it is not part of the payload. There is no password field: the
+ * initial password is generated server-side and the user sets their own via the
+ * emailed B2C set-password link.
  */
 @Data
 @Builder
@@ -20,7 +22,5 @@ public class DsrAdminRegisterRequestDto {
     private String emailId;
     private String mobilePhone;
     private String loginId;
-    /** Initial password; the user must change it on first login. */
-    private String password;
     private Boolean active;
 }

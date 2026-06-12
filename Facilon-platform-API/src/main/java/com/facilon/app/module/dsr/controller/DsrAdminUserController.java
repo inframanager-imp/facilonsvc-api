@@ -54,6 +54,9 @@ public class DsrAdminUserController {
             return ResponseEntity.status(HttpStatus.CREATED).body(dsrAdminUserService.register(dto));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (IllegalStateException e) {
+            // Azure B2C account creation is mandatory; surface the failure to the caller.
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
         }
     }
 

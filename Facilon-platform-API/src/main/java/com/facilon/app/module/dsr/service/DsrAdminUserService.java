@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -44,6 +45,8 @@ public class DsrAdminUserService {
     public static final String AUTHORITY_DSR_ADMIN = "DSR_ADMIN";
     public static final String ROLE_DSR_ADMIN = "DSR_ADMIN";
     public static final String GROUP_DSR_ADMINS = "DSR_Admins";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AuthorizedUserRepository authorizedUserRepository;
     private final UserGroupRepository userGroupRepository;
@@ -69,13 +72,18 @@ public class DsrAdminUserService {
 
         UserGroup dsrAdminGroup = ensureDsrAdminGroup();
 
+        // The initial password is generated server-side and never shown to anyone (Graph
+        // requires one to create the B2C account). The admin sets their own password via
+        // the emailed set-password link.
+        String initialPassword = generateInitialPassword();
+
         AuthorizedUser user = AuthorizedUser.builder()
                 .firstName(dto.getFirstName().trim())
                 .lastName(dto.getLastName().trim())
                 .emailId(dto.getEmailId().trim())
                 .mobilePhone(dto.getMobilePhone() != null ? dto.getMobilePhone().trim() : null)
                 .loginId(dto.getLoginId().trim())
-                .password(passwordEncoder.encode(dto.getPassword()))
+                .password(passwordEncoder.encode(initialPassword))
                 .mustChangePassword(true)
                 .isActive(dto.getActive() == null || dto.getActive())
                 .build();
@@ -85,18 +93,12 @@ public class DsrAdminUserService {
         log.info("Registered DSR Admin user {} ({}) in group {}",
                 saved.getId(), saved.getLoginId(), GROUP_DSR_ADMINS);
 
-        // Same flow as investor self-registration: create the Azure B2C account and email a
-        // FISP-style set-password link. B2C failure must not fail the registration - the local
-        // login path still works with the initial password.
-        String azureUserId = createAzureUser(saved, dto.getPassword());
-        if (azureUserId != null) {
-            sendLoginDetailsEmail(saved.getEmailId(),
-                    saved.getFirstName() + " " + saved.getLastName(),
-                    saved.getLoginId(), buildSetPasswordUrl(azureUserId));
-        } else {
-            log.warn("Set-password email NOT sent for DSR admin {} because Azure user creation failed",
-                    saved.getEmailId());
-        }
+        // The Azure B2C account is mandatory: the emailed set-password link is the only way
+        // the admin can ever log in, so a B2C failure aborts (and rolls back) the registration.
+        String azureUserId = createAzureUser(saved, initialPassword);
+        sendLoginDetailsEmail(saved.getEmailId(),
+                saved.getFirstName() + " " + saved.getLastName(),
+                saved.getLoginId(), buildSetPasswordUrl(azureUserId));
 
         return toDto(saved);
     }
@@ -170,20 +172,20 @@ public class DsrAdminUserService {
 
     /**
      * Creates the Azure B2C user via user-mgmt-service, persists the returned object id onto
-     * the {@code AuthorizedUser}, and returns the GUID (or {@code null} if creation failed).
+     * the {@code AuthorizedUser}, and returns the GUID. The B2C account is mandatory, so any
+     * failure throws {@link IllegalStateException}, rolling back the registration.
      */
     private String createAzureUser(AuthorizedUser user, String password) {
         UserMgmtApiClient userMgmtClient = userMgmtClientProvider.getIfAvailable();
         if (userMgmtClient == null) {
-            log.warn("User management service not available. DSR admin will not be created in Azure AD: {}",
-                    user.getEmailId());
-            return null;
+            throw new IllegalStateException(
+                    "User management service is not available - cannot create the Azure B2C account");
         }
         try {
             TenantB2CConfig b2cConfig = tenantB2CConfigService.getConfigForCurrentTenantOrDefault();
             if (b2cConfig == null) {
-                log.warn("Azure B2C configuration not found. DSR admin will not be created in Azure AD.");
-                return null;
+                throw new IllegalStateException(
+                        "Azure B2C configuration not found - cannot create the Azure B2C account");
             }
             String tenantIdentifier;
             if (b2cConfig.getB2cTenantId() != null && !b2cConfig.getB2cTenantId().isEmpty()) {
@@ -218,11 +220,13 @@ public class DsrAdminUserService {
                     : (response.getErrorMsg() != null && !response.getErrorMsg().isEmpty()
                             ? response.getErrorMsg() : "no Azure id in response");
             log.error("Azure AD user creation failed for DSR admin {}: {}", user.getEmailId(), reason);
-            return null;
+            throw new IllegalStateException("Azure B2C account creation failed: " + reason);
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Azure AD user creation failed with exception for DSR admin {}: {}",
                     user.getEmailId(), e.getMessage(), e);
-            return null;
+            throw new IllegalStateException("Azure B2C account creation failed: " + e.getMessage(), e);
         }
     }
 
@@ -258,9 +262,34 @@ public class DsrAdminUserService {
         if (isBlank(dto.getLoginId())) {
             throw new IllegalArgumentException("Login ID is required");
         }
-        if (isBlank(dto.getPassword()) || dto.getPassword().length() < 8) {
-            throw new IllegalArgumentException("Password is required (minimum 8 characters)");
+    }
+
+    /**
+     * Random 24-char initial password satisfying B2C complexity (one of each character
+     * class guaranteed). Nobody ever sees it - the admin sets their own via the link.
+     */
+    private String generateInitialPassword() {
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghjkmnpqrstuvwxyz";
+        String digits = "23456789";
+        String symbols = "!@#$%^&*";
+        String all = upper + lower + digits + symbols;
+        StringBuilder sb = new StringBuilder()
+                .append(upper.charAt(SECURE_RANDOM.nextInt(upper.length())))
+                .append(lower.charAt(SECURE_RANDOM.nextInt(lower.length())))
+                .append(digits.charAt(SECURE_RANDOM.nextInt(digits.length())))
+                .append(symbols.charAt(SECURE_RANDOM.nextInt(symbols.length())));
+        while (sb.length() < 24) {
+            sb.append(all.charAt(SECURE_RANDOM.nextInt(all.length())));
         }
+        char[] chars = sb.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = SECURE_RANDOM.nextInt(i + 1);
+            char tmp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = tmp;
+        }
+        return new String(chars);
     }
 
     private boolean isBlank(String v) {
