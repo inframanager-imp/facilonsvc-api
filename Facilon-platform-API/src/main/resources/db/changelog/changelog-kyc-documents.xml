@@ -108,4 +108,36 @@
         </sql>
     </changeSet>
 
+    <!--
+        Phase 2 (implemented_docs/kyc-blob-journey-consent-plan.md):
+        encrypted document bytes are staged here between upload and "Looks right".
+        On confirm they move to Azure Blob and this column is cleared; on
+        reject/expiry it is purged. MEDIUMBLOB holds up to 16 MB (10 MB cap).
+    -->
+    <changeSet id="kyc-smartupload-9" author="facilon">
+        <sql>
+            ALTER TABLE kyc_documents ADD COLUMN staged_content LONGBLOB NULL
+        </sql>
+    </changeSet>
+
+    <!--
+        Final plan (implemented_docs/kyc-blob-journey-consent-plan.md):
+        document_url holds the encrypted Azure Blob path (azureblob://...).
+        On journey consent the file is also archived to SharePoint and its id is
+        recorded here, KEEPING BOTH copies. NULL until a journey consent copies it.
+    -->
+    <changeSet id="kyc-smartupload-10" author="facilon">
+        <sql>
+            ALTER TABLE kyc_documents ADD COLUMN sharepoint_url VARCHAR(255) NULL
+        </sql>
+    </changeSet>
+
+    <!-- Original upload filename, retained so the SharePoint archive keeps the
+         correct extension (smart-upload rows otherwise lose it). -->
+    <changeSet id="kyc-smartupload-11" author="facilon">
+        <sql>
+            ALTER TABLE kyc_documents ADD COLUMN original_filename VARCHAR(255) NULL
+        </sql>
+    </changeSet>
+
 </databaseChangeLog>

@@ -340,6 +340,9 @@ public class InvestorProgressService {
 
                 // Option 2: Build account summary
                 InvestorDashboardDto.AccountSummary accountSummary = buildAccountSummary(uniqueCode);
+                // "My Pending Action" feed — incomplete Facilon-status steps (same 6-stage model
+                // as the journey stepper), derived from the section/account-summary flags above.
+                List<InvestorDashboardDto.PendingAction> pendingActions = buildPendingActions(progress, accountSummary);
                 InvestorDashboardDto.AccountSnapshot snapshot = InvestorDashboardDto.AccountSnapshot.builder()
                                 .investorId(investor.getUniqueCode())
                                 .primaryJurisdiction(residenceName)
@@ -393,9 +396,64 @@ public class InvestorProgressService {
                                 .productAssignment(productAssignment)
                                 .applications(applications)
                                 .consentCenter(consentCenter)
+                                .pendingActions(pendingActions)
                                 .delegation(delegation)
                                 .sowAgreed(sowAgreed)
                                 .build();
+        }
+
+        /**
+         * Builds the "My Pending Action" feed: the incomplete steps of the 6-stage onboarding
+         * journey, mirroring the frontend journey stepper's done-logic exactly so the card and the
+         * stepper never disagree. The first incomplete step is the investor's current step
+         * ("PENDING"); later incomplete steps are "REQUIRED". Returns an empty list once every
+         * stage is done.
+         */
+        private List<InvestorDashboardDto.PendingAction> buildPendingActions(
+                        InvestorProgressDto progress,
+                        InvestorDashboardDto.AccountSummary summary) {
+                // key, label, centre, actionRoute, done
+                boolean infoDone = progress != null && progress.getSections() != null
+                                && progress.getSections().get("personalInfo") != null
+                                && Boolean.TRUE.equals(progress.getSections().get("personalInfo").getCompleted());
+                boolean kycDone = summary != null && summary.getKycDocumentsUploaded() != null
+                                && summary.getKycDocumentsRequired() != null
+                                && summary.getKycDocumentsUploaded() >= summary.getKycDocumentsRequired();
+                boolean onboardingDone = summary != null && summary.getOnboardingDocumentsUploaded() != null
+                                && summary.getOnboardingDocumentsRequired() != null
+                                && summary.getOnboardingDocumentsUploaded() >= summary.getOnboardingDocumentsRequired();
+                boolean verificationDone = summary != null && Boolean.TRUE.equals(summary.getVerificationDone());
+                boolean physicalDone = summary != null && Boolean.TRUE.equals(summary.getPhysicalSubmissionDone());
+                boolean accountDone = summary != null && Boolean.TRUE.equals(summary.getAccountOpeningStatus());
+
+                String[][] steps = {
+                                { "information", "Information", "Profile", "/investor/journey" },
+                                { "documents", "KYC Docs", "Compliance", "/investor/documents" },
+                                { "onboarding", "Onboarding", "Onboarding", "/investor/onboarding" },
+                                { "verification", "Verification", "Compliance", "/investor/verification" },
+                                { "physical", "Physical", "Operations", "/investor/physical-submission" },
+                                { "account", "Account", "Banking", "/investor/account-details" },
+                };
+                boolean[] done = { infoDone, kycDone, onboardingDone, verificationDone, physicalDone, accountDone };
+
+                List<InvestorDashboardDto.PendingAction> actions = new ArrayList<>();
+                boolean currentAssigned = false;
+                for (int i = 0; i < steps.length; i++) {
+                        if (done[i]) {
+                                continue;
+                        }
+                        // First not-done step = current ("PENDING"); the rest are "REQUIRED".
+                        String status = currentAssigned ? "REQUIRED" : "PENDING";
+                        currentAssigned = true;
+                        actions.add(InvestorDashboardDto.PendingAction.builder()
+                                        .activity(steps[i][1])
+                                        .centre(steps[i][2])
+                                        .status(status)
+                                        .stepKey(steps[i][0])
+                                        .actionRoute(steps[i][3])
+                                        .build());
+                }
+                return actions;
         }
 
         /**

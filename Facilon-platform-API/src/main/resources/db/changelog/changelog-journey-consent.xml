@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!--
+        Phase 3 (implemented_docs/kyc-blob-journey-consent-plan.md):
+        Per-journey consent to reuse the investor's confirmed KYC documents for a
+        given journey. One row per (investor, journey). Asked the first time each
+        journey is opened once KYC is complete.
+    -->
+    <changeSet id="journey-kyc-consent-1" author="facilon">
+        <sql>
+            CREATE TABLE IF NOT EXISTS investor_journey_kyc_consent (
+                id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+                investor_unique_id VARCHAR(64)  NOT NULL,
+                journey_id         VARCHAR(128) NOT NULL,
+                consent_given_at   DATETIME     NOT NULL,
+                ip_address         VARCHAR(64)  NULL,
+                user_agent         VARCHAR(512) NULL,
+                consent_version    VARCHAR(20)  NULL,
+                tenant_id          BIGINT       NULL,
+                created_by         VARCHAR(255) NULL,
+                created_at         DATETIME     NULL,
+                modified_by        VARCHAR(255) NULL,
+                modified_at        DATETIME     NULL,
+                CONSTRAINT uq_journey_kyc_consent UNIQUE (investor_unique_id, journey_id),
+                INDEX idx_jkc_investor (investor_unique_id)
+            )
+        </sql>
+    </changeSet>
+
+    <!--
+        Record the investor's DECISION (one row per investor+journey) so the prompt
+        is shown only once: consent_given = TRUE on "I Agree", FALSE on "Skip for now".
+        Only TRUE triggers the Blob->SharePoint archive.
+    -->
+    <changeSet id="journey-kyc-consent-2" author="facilon">
+        <sql>
+            ALTER TABLE investor_journey_kyc_consent
+                ADD COLUMN consent_given BOOLEAN NOT NULL DEFAULT TRUE
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

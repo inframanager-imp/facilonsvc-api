@@ -1,0 +1,6 @@
+
+# runtime artifacts (should not be committed)
+uploads/
+**/uploads/
+**/logs/
+*.log

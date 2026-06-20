@@ -76,6 +76,28 @@ public class InvestorDocumentController {
         }
     }
 
+    @GetMapping("/{documentId}/download")
+    @Operation(summary = "Download / preview a KYC document",
+            description = "Streams the document bytes, resolving the SharePoint copy or decrypting the encrypted Azure Blob copy.")
+    public ResponseEntity<byte[]> downloadKycDocument(@PathVariable Long documentId, Authentication authentication) {
+        try {
+            String uniqueCode = getInvestorUniqueCode(authentication);
+            InvestorDocumentService.DownloadResult result = documentService.downloadKycDocument(uniqueCode, documentId);
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + result.fileName() + "\"")
+                    .contentType(MediaType.parseMediaType(result.contentType()))
+                    .body(result.content());
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Error downloading document {}: {}", documentId, e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping
     @Operation(summary = "Get all documents", description = "Get all documents for current investor")
     public ResponseEntity<List<DocumentResponseDto>> getAllDocuments(Authentication authentication) {

@@ -2,6 +2,7 @@ package com.facilon.app.module.client.service;
 
 import com.facilon.app.integration.ocr.OcrExtractionResult;
 import com.facilon.app.integration.ocr.OcrField;
+import com.facilon.app.module.client.config.KycValidationProperties;
 import com.facilon.app.module.client.model.*;
 import com.facilon.app.module.client.repository.KycDocumentFieldRepository;
 import com.facilon.app.module.client.repository.KycDocumentsRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Cross-document validation engine (KYC_DOCUMENT_PLAN §3.6).
@@ -28,6 +30,7 @@ public class KycValidationEngine {
     public static final String SRC_PAN = "PAN";
     public static final String SRC_REGISTRATION = "REGISTRATION";
     public static final String SRC_OCR_DOC_TYPE = "OCR_DOC_TYPE";
+    public static final String SRC_OCR_ID_FIELD = "OCR_ID_FIELD";
     public static final String SRC_EXPIRY = "EXPIRY";
     public static final String SRC_PREREQ = "PREREQ";
     public static final String SRC_OCR_INFRA = "OCR_INFRA";
@@ -35,9 +38,35 @@ public class KycValidationEngine {
     public static final String SEV_BLOCKING = "BLOCKING";
     public static final String SEV_WARNING = "WARNING";
 
+    /**
+     * Per-slot defining ID number: the field names OCR may use for it, the
+     * pattern it must match, and the canonical/label used in the discrepancy.
+     */
+    private record IdFieldSpec(List<String> fieldNames, Pattern pattern,
+                               String canonicalField, String humanLabel) {}
+
+    private static final Map<String, IdFieldSpec> ID_FIELD_SPECS = Map.of(
+            KycRequirementService.DOC_PAN, new IdFieldSpec(
+                    List.of("pan_number", "pan", "pan_card_number"),
+                    Pattern.compile("^[A-Z]{5}[0-9]{4}[A-Z]$"),
+                    "pan_number", "a valid PAN number"),
+            KycRequirementService.DOC_AADHAAR, new IdFieldSpec(
+                    List.of("aadhaar_number", "aadhar_number", "aadhaar", "uid"),
+                    Pattern.compile("^\\d{4}\\s?\\d{4}\\s?\\d{4}$"),
+                    "aadhaar_number", "a valid Aadhaar number"),
+            KycRequirementService.DOC_PASSPORT, new IdFieldSpec(
+                    List.of("passport_number", "passport_no"),
+                    Pattern.compile("^[A-Z]\\d{7,8}$"),
+                    "passport_number", "a valid passport number"),
+            KycRequirementService.DOC_OCI, new IdFieldSpec(
+                    List.of("oci_card_no", "oci_number", "oci_card_number", "ocic_no"),
+                    Pattern.compile("^[A-Z]\\d{7,8}$"),
+                    "oci_card_no", "a valid OCI card number"));
+
     private final KycDocumentsRepository kycDocumentsRepository;
     private final KycDocumentFieldRepository fieldRepository;
     private final UserPersonalInformationRepository personalInfoRepository;
+    private final KycValidationProperties validationProps;
 
     /**
      * Validate an about-to-be-persisted upload. Caller supplies the parsed OCR
@@ -69,14 +98,22 @@ public class KycValidationEngine {
         }
 
         // Rule 11 - OCR detected type matches selected type.
+        // A successful OCR run that produces NO usable type (detectedType null/blank)
+        // is also a mismatch - that is the "random document" case (selfie, blank scan)
+        // where the detector could not identify anything. Severity is gated by
+        // kyc.validation.block-type-mismatch (BLOCKING when on, WARNING when off).
         // For ADDRESS_PROOF, accept any of the allowed sub-types (Bank Statement,
         // Utility Bill, Passport, Aadhaar, Driving License, Rent Agreement).
-        if (ocr != null && ocr.isSuccess() && ocr.detectedType() != null) {
-            if (!ocrTypeMatches(selectedDocType, addressProofSubtype, ocr.detectedType())) {
+        if (ocr != null && ocr.isSuccess()) {
+            String detected = ocr.detectedType();
+            boolean mismatch = detected == null || detected.isBlank()
+                    || !ocrTypeMatches(selectedDocType, addressProofSubtype, detected);
+            if (mismatch) {
                 String expected = toOcrTypeCode(selectedDocType);
+                String sev = validationProps.isBlockTypeMismatch() ? SEV_BLOCKING : SEV_WARNING;
                 issues.add(build(SRC_OCR_DOC_TYPE, "document_type",
                         expected == null ? selectedDocType : expected,
-                        ocr.detectedType(), SEV_BLOCKING));
+                        detected == null || detected.isBlank() ? "unknown" : detected, sev));
             }
         }
 
@@ -90,6 +127,28 @@ public class KycValidationEngine {
             return issues;
         }
         Map<String, String> extracted = indexFields(ocr.fields());
+
+        // Rule 12 - the slot's defining ID number must be present and well-formed.
+        // Stops a document that "looks like" a PAN/Aadhaar/Passport/OCI but carries
+        // no readable ID number from being accepted. ADDRESS_PROOF has no single ID
+        // number, so it is exempt. Gated by kyc.validation.require-id-field.
+        IdFieldSpec idSpec = ID_FIELD_SPECS.get(selectedDocType);
+        if (idSpec != null) {
+            String idValue = null;
+            for (String fieldName : idSpec.fieldNames()) {
+                String v = extracted.get(fieldName);
+                if (v != null && !v.isBlank()) {
+                    idValue = v;
+                    break;
+                }
+            }
+            String normalized = idValue == null ? null : idValue.trim().toUpperCase(Locale.ROOT);
+            if (normalized == null || !idSpec.pattern().matcher(normalized).matches()) {
+                String sev = validationProps.isRequireIdField() ? SEV_BLOCKING : SEV_WARNING;
+                issues.add(build(SRC_OCR_ID_FIELD, idSpec.canonicalField(),
+                        idSpec.humanLabel(), idValue == null ? "missing" : idValue, sev));
+            }
+        }
 
         // Rules 2, 3 - passport name/DOB vs PAN
         // Rules 4 - Aadhaar name vs PAN

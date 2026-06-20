@@ -22,6 +22,13 @@ public class InvestorDashboardDto {
     private ProductAssignment productAssignment;
     private List<ApplicationItem> applications;
     private List<ConsentItem> consentCenter;
+    /**
+     * Incomplete Facilon-status steps of the investor's onboarding journey, surfaced as the
+     * "My Pending Action" card. Derived from the same 6-stage model as the journey stepper:
+     * Information, KYC Docs, Onboarding, Verification, Physical, Account. Empty once onboarding
+     * is complete.
+     */
+    private List<PendingAction> pendingActions;
     private DelegationInfo delegation;
     /**
      * True once the investor has agreed to their Statement of Work (SOW submitted/approved and
@@ -146,6 +153,18 @@ public class InvestorDashboardDto {
         private Boolean actionRequired;
         private String action; // "ACTIVATE" | "UPDATE" | "REVOKE" | "NONE"
         private String key;    // stable id for the action flow: "sow" | "marketing" | "whatsapp" | "privacy" | "platformTerms"
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PendingAction {
+        private String activity;   // step label, e.g. "KYC Docs"
+        private String centre;     // grouping shown in the CENTRA column, e.g. "Compliance"
+        private String status;     // "PENDING" (current/in-progress step) | "REQUIRED" (not started)
+        private String stepKey;    // stable step id: information|documents|onboarding|verification|physical|account
+        private String actionRoute; // frontend route to act on this step
     }
 
     @Data

@@ -2,6 +2,8 @@ package com.facilon.app.module.client.service;
 
 import com.facilon.app.integration.dynamics.DynamicsCrmService;
 import com.facilon.app.integration.sharepoint.SharePointService;
+import com.facilon.app.integration.storage.AzureBlobStorage;
+import com.facilon.app.integration.storage.DocumentCipher;
 import com.facilon.app.module.client.dto.DocumentResponseDto;
 import com.facilon.app.module.client.dto.KycDocumentRequirementDto;
 import com.facilon.app.module.client.model.Investor;
@@ -17,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -39,6 +42,8 @@ public class InvestorDocumentService {
     private final KycDocumentsRepository kycDocumentsRepository;
     private final IntroInvestorTempRepository introInvestorTempRepository;
     private final UserPersonalInformationRepository userPersonalInformationRepository;
+    private final AzureBlobStorage blobStorage;
+    private final DocumentCipher documentCipher;
     
     @Autowired(required = false)
     private SharePointService sharePointService;
@@ -179,7 +184,7 @@ public class InvestorDocumentService {
                 .documentType(doc.getDocumentType())
                 .documentCategory("kyc")
                 .fileName(file.getOriginalFilename())
-                .documentUrl(doc.getDocumentUrl())
+                .documentUrl(effectiveUrl(doc))
                 .contentType(file.getContentType())
                 .fileSize(file.getSize())
                 .status(doc.getStatus() != null ? doc.getStatus() : "Submitted")
@@ -190,6 +195,153 @@ public class InvestorDocumentService {
     private static String sanitizeFileName(String name) {
         if (name == null) return "document";
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    /**
+     * The URL to surface for view/download: prefer the SharePoint copy (set after a
+     * journey consent archives a Blob-stored doc) over the raw document_url, which
+     * for Documents-Center docs is an encrypted azureblob:// path. Null-safe.
+     */
+    private static String effectiveUrl(KycDocuments doc) {
+        if (doc == null) return null;
+        String sp = doc.getSharepointUrl();
+        return (sp != null && !sp.isBlank()) ? sp : doc.getDocumentUrl();
+    }
+
+    /** Streamed download payload (bytes + display name + content type). */
+    public record DownloadResult(byte[] content, String fileName, String contentType) {}
+
+    /**
+     * Resolve and return the actual bytes of a KYC document for view/download,
+     * transparently across storage backends:
+     *   - sharepoint_url present  -> SharePoint download (the archived copy),
+     *   - document_url azureblob:// -> Blob retrieve + AES decrypt,
+     *   - document_url sharepoint:// or raw id -> SharePoint download,
+     *   - otherwise -> local filesystem path.
+     * Ownership is enforced against the caller's investor unique code.
+     */
+    @Transactional(readOnly = true)
+    public DownloadResult downloadKycDocument(String uniqueCode, Long documentId) {
+        KycDocuments doc = kycDocumentsRepository.findById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+        if (doc.getInvestorUniqueId() == null || !doc.getInvestorUniqueId().equals(uniqueCode)) {
+            throw new SecurityException("Not your document");
+        }
+        byte[] content = resolveDocumentBytes(doc);
+        String name = (doc.getOriginalFilename() != null && !doc.getOriginalFilename().isBlank())
+                ? doc.getOriginalFilename()
+                : doc.getDocumentType();
+        return new DownloadResult(content, sanitizeFileName(name), guessContentType(name));
+    }
+
+    private byte[] resolveDocumentBytes(KycDocuments doc) {
+        // Prefer the SharePoint copy when present.
+        String sp = doc.getSharepointUrl();
+        if (sp != null && !sp.isBlank()) {
+            return sharePointDownload(stripScheme(sp, "sharepoint://"));
+        }
+        String url = doc.getDocumentUrl();
+        if (url == null || url.isBlank()) {
+            throw new IllegalStateException("Document has no stored content");
+        }
+        if (url.startsWith("azureblob://")) {
+            return documentCipher.decrypt(blobStorage.retrieve(url)); // encrypted at rest
+        }
+        if (url.startsWith("sharepoint://")) {
+            return sharePointDownload(stripScheme(url, "sharepoint://"));
+        }
+        // Legacy: raw SharePoint item id, else a local filesystem path.
+        try {
+            return sharePointDownload(url);
+        } catch (Exception ex) {
+            try {
+                return Files.readAllBytes(Paths.get(url));
+            } catch (Exception ioe) {
+                throw new IllegalStateException("Unable to read document content");
+            }
+        }
+    }
+
+    private byte[] sharePointDownload(String itemId) {
+        if (sharePointService == null) {
+            throw new IllegalStateException("SharePoint not available");
+        }
+        return sharePointService.downloadFile(itemId);
+    }
+
+    private static String stripScheme(String url, String scheme) {
+        return url.startsWith(scheme) ? url.substring(scheme.length()) : url;
+    }
+
+    private static String guessContentType(String fileName) {
+        String f = fileName == null ? "" : fileName.toLowerCase();
+        if (f.endsWith(".pdf")) return "application/pdf";
+        if (f.endsWith(".png")) return "image/png";
+        if (f.endsWith(".jpg") || f.endsWith(".jpeg")) return "image/jpeg";
+        return "application/octet-stream";
+    }
+
+    /**
+     * NEW (final plan): archive an already-confirmed, Blob-stored KYC document to
+     * SharePoint from raw bytes, triggered by a journey consent. Runs the SAME
+     * SharePoint + Dataverse process as {@link #uploadKycDocument} but:
+     *   - operates on a byte[] (the decrypted Blob content), not a MultipartFile,
+     *   - writes the SharePoint id into kyc_documents.sharepoint_url and DOES NOT
+     *     touch document_url (the azureblob:// path is kept - both copies retained),
+     *   - is idempotent: a doc that already has sharepoint_url is skipped.
+     * The existing uploadKycDocument flow and /investor/documents are untouched.
+     *
+     * Runs in its OWN transaction (REQUIRES_NEW): a SharePoint failure here rolls
+     * back only this doc's work and never poisons the caller's transaction (e.g.
+     * the journey consent), which is committed independently.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void archiveConfirmedDocToSharePoint(String uniqueCode, Long kycDocumentId, byte[] bytes,
+                                                String fileName, String documentType, String documentMasterId) {
+        if (bytes == null || bytes.length == 0) {
+            return;
+        }
+        if (sharePointService == null) {
+            log.warn("SharePoint not available; cannot archive KYC doc {} for {}", kycDocumentId, uniqueCode);
+            return;
+        }
+        KycDocuments doc = kycDocumentsRepository.findById(kycDocumentId).orElse(null);
+        if (doc == null) {
+            log.warn("archiveConfirmedDocToSharePoint: kyc doc {} not found", kycDocumentId);
+            return;
+        }
+        if (doc.getSharepointUrl() != null && !doc.getSharepointUrl().isBlank()) {
+            return; // already archived - idempotent
+        }
+
+        String safeName = documentType + "_" + System.currentTimeMillis() + "_" + sanitizeFileName(fileName);
+        String folderPath = "KYC/" + uniqueCode;
+        String itemId;
+        try {
+            itemId = sharePointService.uploadFile(folderPath, safeName, bytes);
+            log.info("✅ Archived KYC doc {} to SharePoint: {}", kycDocumentId, itemId);
+        } catch (Exception e) {
+            log.error("❌ SharePoint archive failed for doc {}: {}", kycDocumentId, e.getMessage());
+            throw new RuntimeException("SharePoint archive failed: " + e.getMessage(), e);
+        }
+
+        doc.setSharepointUrl("sharepoint://" + itemId); // keep document_url (azureblob://) intact
+        if (doc.getStatus() == null || doc.getStatus().isBlank()) {
+            doc.setStatus("Submitted");
+        }
+        kycDocumentsRepository.save(doc);
+
+        // Full Dataverse sync (same as uploadKycDocument) - only when documentMasterId resolvable.
+        if (dynamicsCrmService != null && documentMasterId != null && !documentMasterId.isEmpty()) {
+            try {
+                dynamicsCrmService.updateInvestorDocumentUrl(documentMasterId, itemId);
+                updateVerificationStatus(uniqueCode);
+                log.info("✅ Synced archived doc {} to Dataverse", kycDocumentId);
+            } catch (Exception e) {
+                log.error("❌ Dataverse sync failed for archived doc {}: {}", kycDocumentId, e.getMessage());
+                // Non-fatal: SharePoint archive succeeded.
+            }
+        }
     }
 
     /**
@@ -334,7 +486,7 @@ public class InvestorDocumentService {
                 .documentType(doc.getDocumentType())
                 .documentCategory("onboarding")
                 .fileName(file.getOriginalFilename())
-                .documentUrl(doc.getDocumentUrl())
+                .documentUrl(effectiveUrl(doc))
                 .contentType(file.getContentType())
                 .fileSize(file.getSize())
                 .status(doc.getStatus())
@@ -389,7 +541,7 @@ public class InvestorDocumentService {
                 .documentType(doc.getDocumentType())
                 .documentCategory("onboarding")
                 .fileName(file.getOriginalFilename())
-                .documentUrl(doc.getDocumentUrl())
+                .documentUrl(effectiveUrl(doc))
                 .contentType(file.getContentType())
                 .fileSize(file.getSize())
                 .status(doc.getStatus())
@@ -537,8 +689,8 @@ public class InvestorDocumentService {
                     .localStatus(doc.getStatus() != null ? doc.getStatus() : "Pending")
                     .reason(doc.getReason())
                     .localDocumentId(doc.getId())
-                    .fileName(extractFileName(doc.getDocumentUrl()))
-                    .documentUrl(doc.getDocumentUrl())
+                    .fileName(extractFileName(effectiveUrl(doc)))
+                    .documentUrl(effectiveUrl(doc))
                     .uploadedAt(doc.getCreatedAt() != null ? doc.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                     .acceptedFormats(List.of("PDF", "JPG", "JPEG"))
                     .maxSize("10 MB")
@@ -619,13 +771,13 @@ public class InvestorDocumentService {
     private DocumentResponseDto mapToDto(KycDocuments doc) {
         String fileName = (doc.getDocDescription() != null && !doc.getDocDescription().isEmpty())
                 ? doc.getDocDescription()
-                : extractFileName(doc.getDocumentUrl());
+                : extractFileName(effectiveUrl(doc));
         return DocumentResponseDto.builder()
                 .id(doc.getId())
                 .documentType(doc.getDocumentType())
                 .documentCategory(doc.getUploadType() == 1 ? "kyc" : "onboarding")
                 .fileName(fileName)
-                .documentUrl(doc.getDocumentUrl())
+                .documentUrl(effectiveUrl(doc))
                 .status(doc.getStatus() != null ? doc.getStatus() : "pending")
                 .uploadedAt(doc.getCreatedAt() != null ? doc.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                 .description(doc.getDocDescription())
@@ -787,8 +939,8 @@ public class InvestorDocumentService {
                     .localStatus(uploaded != null ? (uploaded.getStatus() != null ? uploaded.getStatus() : "Pending") : null)
                     .reason(uploaded != null ? uploaded.getReason() : null)
                     .localDocumentId(uploaded != null ? uploaded.getId() : null)
-                    .fileName(uploaded != null ? extractFileName(uploaded.getDocumentUrl()) : null)
-                    .documentUrl(uploaded != null ? uploaded.getDocumentUrl() : null)
+                    .fileName(uploaded != null ? extractFileName(effectiveUrl(uploaded)) : null)
+                    .documentUrl(effectiveUrl(uploaded))
                     .documentMasterUrl(documentMasterUrl) // SharePoint URL for downloadable templates
                     .uploadedAt(uploaded != null && uploaded.getCreatedAt() != null ? uploaded.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                     .inputId("actual-btn-" + dynamicsId)
@@ -844,8 +996,8 @@ public class InvestorDocumentService {
                     .localStatus(uploaded != null ? (uploaded.getStatus() != null ? uploaded.getStatus() : "Pending") : null)
                     .reason(uploaded != null ? uploaded.getReason() : null)
                     .localDocumentId(uploaded != null ? uploaded.getId() : null)
-                    .fileName(uploaded != null ? extractFileName(uploaded.getDocumentUrl()) : null)
-                    .documentUrl(uploaded != null ? uploaded.getDocumentUrl() : null)
+                    .fileName(uploaded != null ? extractFileName(effectiveUrl(uploaded)) : null)
+                    .documentUrl(effectiveUrl(uploaded))
                     .uploadedAt(uploaded != null && uploaded.getCreatedAt() != null ? uploaded.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : null)
                     .inputId("actual-btn-" + dynamicsId)
                     .spanId("file-chosen-" + dynamicsId)

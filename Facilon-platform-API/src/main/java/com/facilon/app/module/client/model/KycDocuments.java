@@ -110,6 +110,28 @@ public class KycDocuments extends TenantEntity {
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
+    /**
+     * Phase 2: AES-256-GCM-encrypted document bytes held between upload and
+     * "Looks right". Moved to Azure Blob (document_url) and cleared on confirm;
+     * purged on reject/expiry. Lazy so list/validation queries don't load the blob.
+     */
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "staged_content", columnDefinition = "LONGBLOB")
+    private byte[] stagedContent;
+
+    /**
+     * SharePoint item reference (sharepoint://itemId) set when a journey consent
+     * archives this Blob-stored document to SharePoint. document_url keeps the
+     * azureblob:// path - both copies are retained. Null until first archived.
+     */
+    @Column(name = "sharepoint_url", length = 255)
+    private String sharepointUrl;
+
+    /** Original upload filename, kept so the SharePoint archive retains the extension. */
+    @Column(name = "original_filename", length = 255)
+    private String originalFilename;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

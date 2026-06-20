@@ -191,6 +191,12 @@
 			<artifactId>playwright</artifactId>
 			<version>1.49.0</version>
 		</dependency>
+		<!-- Azure Blob Storage for encrypted KYC document storage (matches user-mgmt-service version) -->
+		<dependency>
+			<groupId>com.azure</groupId>
+			<artifactId>azure-storage-blob</artifactId>
+			<version>12.21.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>

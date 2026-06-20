@@ -6,6 +6,15 @@ spring:
       max-file-size: 10MB
       max-request-size: 60MB   # allows multi-file DSR supporting evidence (up to 10 x 5MB)
 
+# SECURITY: every profile sets org.springframework.web=DEBUG, which makes RestTemplate
+# log full outbound request bodies. The OAuth2 client-credentials token call (SharePoint
+# + Dynamics) then leaks the Azure client_secret in plaintext. Pin this more-specific
+# logger to INFO so token request bodies are never logged; it overrides the broader
+# org.springframework.web=DEBUG in all profiles (Logback resolves by most-specific name).
+logging:
+  level:
+    org.springframework.web.client.RestTemplate: INFO
+
 # JAVAPDFill service — fills the blank Ventura NRI AcroForm PDF with investor data.
 # Deployed separately (see d:/sam/facilon-git_bub/JAVAPDFill); Facilon calls it over HTTP.
 fillpdf:
@@ -30,6 +39,24 @@ fillpdf:
     # Classpath path to the blank fillable NRI booklet (loaded by KycPdfService.generateKycPdfViaFillApi).
     nri-template: templates/pdf/kyc-form/nri/Ventura_Account_opening_NRI.pdf
 
+# Encrypted Azure Blob storage for confirmed KYC documents
+# (plan: implemented_docs/kyc-blob-journey-consent-plan.md, Phase 1/2).
+# Default OFF so the app boots without Azure until a real connection string is set.
+# connection-string is a SECRET — keep it in env, never commit/log it.
+azure:
+  blob:
+    enabled: ${AZURE_BLOB_ENABLED:false}
+    # SECRET — provide via the AZURE_BLOB_CONNECTION_STRING env var only. Never commit it.
+    connection-string: ${AZURE_BLOB_CONNECTION_STRING:}
+    container-name: ${AZURE_BLOB_CONTAINER:facilondocs}
+
+# App-level AES-256-GCM key for KYC document encryption (base64 of 32 raw bytes).
+# Keep STABLE — rotating without a versioned key registry makes old blobs undecryptable.
+document:
+  encryption:
+    # SECRET — provide via the DOCUMENT_ENCRYPTION_KEY env var only (base64 of 32 bytes). Never commit it.
+    key: ${DOCUMENT_ENCRYPTION_KEY:}
+
 # Smart Upload OCR - integrates with the ORCReader microservice (plan §3.5).
 # ORCReader must be running as a separate process; default http://localhost:8080.
 ai:
@@ -53,3 +80,18 @@ kyc:
   address-proof:
     recent-doc-validity-days: 90
     rent-agreement-validity-days: 335
+  # Strict document-type enforcement for Smart Upload (plan: implemented_docs/
+  # smart-upload-document-validation.md). All default OFF so the code ships dormant.
+  # Enable per environment ONLY after ORCReader OCI/Passport disambiguation is verified.
+  validation:
+    # Reject (HTTP 409) when OCR-detected type is unknown or mismatches the slot.
+    block-type-mismatch: ${KYC_BLOCK_TYPE_MISMATCH:true}
+    # Require the slot's defining ID number (PAN/Aadhaar/Passport/OCI) to be present & valid.
+    require-id-field: ${KYC_REQUIRE_ID_FIELD:true}
+    # Reject when ORCReader is down/unsuccessful. WARNING: halts all KYC uploads during an OCR outage.
+    block-on-ocr-failure: ${KYC_BLOCK_ON_OCR_FAILURE:true}
+  # Documents Center storage: when azure.blob.enabled AND DOCUMENT_ENCRYPTION_KEY
+  # are set, the file is encrypted into staged_content at upload and pushed to
+  # Azure Blob on "Looks right". Default ON (kill-switch back to immediate storage).
+  storage:
+    defer-to-confirm: ${KYC_DEFER_STORAGE_TO_CONFIRM:true}

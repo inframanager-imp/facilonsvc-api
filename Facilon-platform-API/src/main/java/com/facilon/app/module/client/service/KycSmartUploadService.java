@@ -4,6 +4,11 @@ import com.facilon.app.config.TenantContextHolder;
 import com.facilon.app.integration.ocr.OcrClient;
 import com.facilon.app.integration.ocr.OcrExtractionResult;
 import com.facilon.app.integration.ocr.OcrField;
+import com.facilon.app.integration.storage.AzureBlobStorage;
+import com.facilon.app.integration.storage.BlobStorageProperties;
+import com.facilon.app.integration.storage.DocumentCipher;
+import com.facilon.app.module.client.config.KycStorageProperties;
+import com.facilon.app.module.client.config.KycValidationProperties;
 import com.facilon.app.module.client.dto.KycDocumentDiscrepancyDto;
 import com.facilon.app.module.client.dto.KycDocumentFieldDto;
 import com.facilon.app.module.client.dto.KycSmartDocumentDto;
@@ -61,6 +66,11 @@ public class KycSmartUploadService {
     private final KycValidationEngine validationEngine;
     private final KycProfileImportService profileImportService;
     private final KycCompletenessService completenessService;
+    private final KycValidationProperties validationProps;
+    private final AzureBlobStorage blobStorage;
+    private final DocumentCipher documentCipher;
+    private final BlobStorageProperties blobProperties;
+    private final KycStorageProperties storageProperties;
 
     @Value("${investor.kyc.upload-dir:uploads/kyc}")
     private String uploadDir;
@@ -86,7 +96,26 @@ public class KycSmartUploadService {
 
         validateInputs(file, documentType, addressProofType);
 
-        String documentUrl = storeFile(file, investor.getUniqueCode(), documentType);
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not read uploaded file", e);
+        }
+
+        // Phase 2 (plan: implemented_docs/kyc-blob-journey-consent-plan.md):
+        // when deferred storage is enabled AND Blob + cipher are configured, encrypt
+        // the file and hold it in staged_content now; it moves to Azure Blob only on
+        // confirm. Otherwise keep today's behaviour - store immediately (SharePoint/local).
+        boolean deferStorage = storageProperties.isDeferToConfirm()
+                && documentCipher.isConfigured() && blobProperties.isEnabled();
+        String documentUrl = null;
+        byte[] stagedContent = null;
+        if (deferStorage) {
+            stagedContent = documentCipher.encrypt(bytes);
+        } else {
+            documentUrl = storeFile(file, investor.getUniqueCode(), documentType);
+        }
 
         // Persist the row first so OCR failures don't lose the file.
         KycDocuments doc = KycDocuments.builder()
@@ -94,6 +123,8 @@ public class KycSmartUploadService {
                 .ssInvestorId(String.valueOf(investor.getId()))
                 .status("Submitted")
                 .documentUrl(documentUrl)
+                .stagedContent(stagedContent)
+                .originalFilename(file.getOriginalFilename())
                 .documentType(documentType)
                 .docDescription(documentType)
                 .uploadType(1)
@@ -103,13 +134,6 @@ public class KycSmartUploadService {
                 .build();
         doc.setTenant(TenantContextHolder.getContext().getTenant());
         doc = kycRepository.save(doc);
-
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not read uploaded file", e);
-        }
 
         // ORCReader call - plan §3.1 / §3.5
         OcrExtractionResult ocr = ocrClient.extract(bytes, file.getContentType(),
@@ -176,15 +200,19 @@ public class KycSmartUploadService {
         List<KycDocumentDiscrepancy> issues =
                 validationEngine.validate(investor, documentType, addressProofType, ocr, expiryDate);
 
-        // Surface OCR failure as a non-blocking discrepancy so the UI can show the reason
-        // (otherwise a re-upload that also fails OCR looks identical to the first failure).
+        // Surface OCR failure so the UI can show the reason (otherwise a re-upload that
+        // also fails OCR looks identical to the first failure). Severity is gated by
+        // kyc.validation.block-on-ocr-failure: BLOCKING rejects the upload (fail closed)
+        // when on, WARNING accepts-with-review when off (survives an OCR outage).
         if (ocr == null || !ocr.isSuccess()) {
+            String sev = validationProps.isBlockOnOcrFailure()
+                    ? KycValidationEngine.SEV_BLOCKING : KycValidationEngine.SEV_WARNING;
             issues.add(KycDocumentDiscrepancy.builder()
                     .canonicalSource(KycValidationEngine.SRC_OCR_INFRA)
                     .fieldName("ocr_extraction")
                     .expectedValue("success")
                     .observedValue(ocr == null ? "no response" : firstNonBlank(ocr.error(), "unknown error"))
-                    .severity(KycValidationEngine.SEV_WARNING)
+                    .severity(sev)
                     .build());
         }
         for (KycDocumentDiscrepancy d : issues) {
@@ -299,6 +327,9 @@ public class KycSmartUploadService {
         List<KycProfileImportService.ImportConflict> conflicts = List.of();
         if (updated > 0) {
             doc.setConfirmedAt(now);
+            // Phase 2: now that the investor confirmed, move the encrypted staged
+            // bytes to Azure Blob and record the blob path (no-op if not staged).
+            moveStagedToBlob(doc);
             KycProfileImportService.ImportResult result = profileImportService.importFromDocument(doc);
             conflicts = result.conflicts();
             log.info("Confirm imported {} field(s), {} conflict(s) skipped for doc {}",
@@ -339,6 +370,7 @@ public class KycSmartUploadService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot reject an approved document");
         }
         doc.setDeletedAt(LocalDateTime.now());
+        doc.setStagedContent(null); // Phase 2: purge encrypted staged bytes for rejected uploads
         kycRepository.save(doc);
         // Restore the prior version of this slot (if any) so the slot is not
         // left in NOT_UPLOADED when a previous valid version existed.
@@ -384,6 +416,25 @@ public class KycSmartUploadService {
                         "addressProofType required for ADDRESS_PROOF, one of " + ADDRESS_PROOF_TYPES);
             }
         }
+    }
+
+    /**
+     * Phase 2: on confirm, move the AES-256-GCM-encrypted staged bytes to Azure
+     * Blob and record the {@code azureblob://} path. No-op when storage was not
+     * deferred (document_url already set, nothing staged).
+     */
+    private void moveStagedToBlob(KycDocuments doc) {
+        byte[] staged = doc.getStagedContent();
+        if (staged == null || staged.length == 0) {
+            return;
+        }
+        String objectPath = "kyc/" + doc.getInvestorUniqueId() + "/"
+                + doc.getId() + "_" + doc.getDocumentType();
+        String url = blobStorage.store(staged, objectPath);
+        doc.setDocumentUrl(url);
+        doc.setStagedContent(null);
+        kycRepository.save(doc);
+        log.info("Confirm moved staged document {} to Blob: {}", doc.getId(), url);
     }
 
     private String storeFile(MultipartFile file, String investorCode, String documentType) {

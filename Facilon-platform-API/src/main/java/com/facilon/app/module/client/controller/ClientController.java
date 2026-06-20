@@ -8,11 +8,14 @@ import com.facilon.app.module.client.dto.InvestorProgressDto;
 import com.facilon.app.module.client.dto.InvestorDashboardDto;
 import com.facilon.app.module.client.dto.AccountDetailsDto;
 import com.facilon.app.module.client.dto.JourneyListItemDto;
+import com.facilon.app.module.client.dto.JourneyKycGateDto;
 import com.facilon.app.module.client.service.ClientService;
 import com.facilon.app.module.client.service.InvestorProgressService;
+import com.facilon.app.module.client.service.JourneyKycConsentService;
 import com.facilon.app.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +38,7 @@ public class ClientController {
 
     private final ClientService clientService;
     private final InvestorProgressService investorProgressService;
+    private final JourneyKycConsentService journeyKycConsentService;
 
     /**
      * Get current user's client profile.
@@ -193,5 +197,66 @@ public class ClientController {
             log.error("Error getting journeys: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
+    }
+
+    /**
+     * Phase 3 gate for opening a journey: reports whether KYC is complete and
+     * whether this journey already has KYC-reuse consent. The UI uses this to
+     * ask for consent (first time) or route to documents-center (KYC incomplete).
+     */
+    @GetMapping("/me/journeys/{journeyId}/kyc-gate")
+    @Operation(summary = "Journey KYC gate",
+            description = "Whether KYC is complete and whether this journey already has KYC-reuse consent")
+    public ResponseEntity<JourneyKycGateDto> journeyKycGate(@PathVariable String journeyId,
+                                                            Authentication authentication) {
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        InvestorDto client = clientService.getMyClientProfile(userPrincipal.getId());
+        return ResponseEntity.ok(journeyKycConsentService.gate(client.getUniqueCode(), journeyId));
+    }
+
+    /**
+     * Record the investor's consent to reuse their confirmed KYC documents for
+     * this journey. Idempotent. Requires KYC to be complete.
+     */
+    @PostMapping("/me/journeys/{journeyId}/kyc-consent")
+    @Operation(summary = "Give journey KYC consent",
+            description = "Record consent to reuse confirmed KYC documents for this journey")
+    public ResponseEntity<Void> journeyKycConsent(@PathVariable String journeyId,
+                                                  HttpServletRequest request,
+                                                  Authentication authentication) {
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        InvestorDto client = clientService.getMyClientProfile(userPrincipal.getId());
+        // 1) record + commit the consent (own transaction).
+        journeyKycConsentService.recordConsent(client.getUniqueCode(), journeyId,
+                clientIp(request), request.getHeader("User-Agent"));
+        // 2) THEN archive confirmed KYC docs Blob -> SharePoint (no DB tx held; failures
+        //    are isolated per-doc and never roll back the consent).
+        journeyKycConsentService.archiveConfirmedKycDocuments(client.getUniqueCode());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Record a "Skip for now" decision so the consent prompt is shown only once.
+     * Does not submit documents or sync Dataverse.
+     */
+    @PostMapping("/me/journeys/{journeyId}/kyc-skip")
+    @Operation(summary = "Skip journey KYC consent",
+            description = "Record that the investor declined KYC-reuse consent for this journey (asked once).")
+    public ResponseEntity<Void> journeyKycSkip(@PathVariable String journeyId,
+                                               HttpServletRequest request,
+                                               Authentication authentication) {
+        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        InvestorDto client = clientService.getMyClientProfile(userPrincipal.getId());
+        journeyKycConsentService.recordSkip(client.getUniqueCode(), journeyId,
+                clientIp(request), request.getHeader("User-Agent"));
+        return ResponseEntity.ok().build();
+    }
+
+    private static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
