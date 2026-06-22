@@ -115,6 +115,14 @@ dataverse:
     cron: "0 */15 * * * *"
     # Set to false to disable the scheduled document status sync
     cron-enabled: true
+  latest-investor-check:
+    # Mirrors Laravel latest_investor_check ->everyMinute() (Investor/app/Console/Kernel.php).
+    # Fans out over every active tenant each run.
+    cron: "0 * * * * *"
+    cron-enabled: true
+    # Base URL for the registration link in the intro email
+    # (Laravel: config('app.url') . '/introduce-investor1/' . Crypt::encrypt($code)).
+    intro-link-base-url: http://${client.host}:3000/account/investor/introduce-investor1
   sharepoint:
     parent-location-id: "112fd6a2-12f1-f011-8406-7ced8d285638"
     site-collection-id: "43de59de-265e-f011-877b-7c1e5232a375"

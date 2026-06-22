@@ -112,6 +112,10 @@ dataverse:
   document-status-sync:
     cron: "0 */15 * * * *"
     cron-enabled: true
+  latest-investor-check:
+    cron: "0 * * * * *"
+    cron-enabled: ${LATEST_INVESTOR_CHECK_CRON_ENABLED:true}
+    intro-link-base-url: ${LATEST_INVESTOR_CHECK_INTRO_LINK_BASE_URL:https://${client.host}:${client.port}/account/investor/introduce-investor1}
   sharepoint:
     parent-location-id: ${DATAVERSE_SHAREPOINT_PARENT_LOCATION_ID:112fd6a2-12f1-f011-8406-7ced8d285638}
     site-collection-id: ${DATAVERSE_SHAREPOINT_SITE_COLLECTION_ID:43de59de-265e-f011-877b-7c1e5232a375}

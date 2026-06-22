@@ -105,6 +105,34 @@ public class InvestorNotificationService {
     }
     
     /**
+     * 3b. Send the auto-introduction email to a freshly-created Dataverse investor.
+     *
+     * <p>Direct port of Laravel {@code InnerPageController::latest_investor_check}
+     * (and {@code _pms}) — the per-minute cron that emails investors created
+     * today in Dynamics with an encrypted registration link. Mirrors the
+     * {@code intro-investor-mail.blade.php} body and the
+     * {@code "{firm} - Introducing Facilon"} subject.
+     *
+     * @param email                investor email (Dataverse {@code ss_emailintroduceind})
+     * @param investorName         investor first name (Dataverse {@code ss_firstnameintroduceind})
+     * @param serviceProviderName  resolved firm name (master_accounts.name)
+     * @param introLink            registration link with the encrypted {@code ss_name} code
+     */
+    public void sendInvestorIntroductionEmail(String email, String investorName, String serviceProviderName, String introLink) {
+        String subject = (serviceProviderName != null ? serviceProviderName : "Facilon") + " - Introducing Facilon";
+
+        Map<String, String> variables = new HashMap<>();
+        variables.put("name", investorName != null ? investorName : "Investor");
+        variables.put("serviceProviderName", serviceProviderName != null ? serviceProviderName : "your Service Provider");
+        variables.put("introLink", introLink);
+
+        String htmlBody = templateLoader.processTemplate("19-introduced-investor-intro.html", variables);
+        emailService.sendHtmlMessage(email, subject, htmlBody);
+
+        log.info("Investor introduction email sent to: {}", email);
+    }
+
+    /**
      * 4. Send assistance email for investors outside India (Self)
      */
     public void sendOutsideIndiaAssistanceSelfEmail(String email, String investorName) {
