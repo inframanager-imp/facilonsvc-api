@@ -885,8 +885,8 @@ public class IntroducedInvestorRegistrationService {
                                              String ociCardStatus) {
         if (registerAs == null) return null;
         boolean isIndividual = registerAs == 1;
-        boolean isIndiaNationality = isIndiaId(nationalityId);
-        boolean isIndiaResidence = isIndiaId(countryOfResidenceId);
+        boolean isIndiaNationality = isIndiaNationalityRef(nationalityId);
+        boolean isIndiaResidence = isIndiaResidenceRef(countryOfResidenceId);
         boolean isIndiaIncorporation = !isIndividual && isIndiaResidence;
         boolean hasPan = "yes".equalsIgnoreCase(pancardStatus);
         boolean hasOci = "yes".equalsIgnoreCase(ociCardStatus);
@@ -933,8 +933,47 @@ public class IntroducedInvestorRegistrationService {
      * introduced-flow type inference uses the same rule as the onboarding
      * re-evaluation downstream.
      */
-    private static boolean isIndiaId(Integer id) {
-        return id != null && (id == 1 || id == 240);
+    /**
+     * Whether the given nationality reference is India.
+     *
+     * <p>In this flow {@code parseNationality} resolves a Dataverse GUID to
+     * {@code master_nationality.id} (the business {@code id} column, e.g. 245 for India),
+     * so we resolve that row and test a STABLE attribute (ISO {@code IN} / name {@code Indian}).
+     * The old {@code id == 1 || 240} hardcode was wrong (India's id is 245, never 1/240) and
+     * unstable across master re-syncs.
+     */
+    private boolean isIndiaNationalityRef(Integer nationalityId) {
+        if (nationalityId == null) {
+            return false;
+        }
+        return nationalityRepository.findByIdColumn(nationalityId)
+                .map(n -> isIndiaText(n.getSsNationality()) || isIndiaText(n.getSsName()))
+                .orElse(false);
+    }
+
+    /**
+     * Whether the given country-of-residence reference is India.
+     *
+     * <p>{@code parseCountryOfResidence} resolves a Dataverse GUID to
+     * {@code master_country_of_residence.id} (the JPA primary key), so we look that row up
+     * and test its country name.
+     */
+    private boolean isIndiaResidenceRef(Integer countryOfResidenceId) {
+        if (countryOfResidenceId == null) {
+            return false;
+        }
+        return countryOfResidenceRepository.findById(countryOfResidenceId.longValue())
+                .map(c -> isIndiaText(c.getSsName()))
+                .orElse(false);
+    }
+
+    /** True when the text is India's ISO code ("IN") or India/Indian by name. */
+    private static boolean isIndiaText(String value) {
+        if (value == null) {
+            return false;
+        }
+        String v = value.trim();
+        return v.equalsIgnoreCase("IN") || v.equalsIgnoreCase("India") || v.equalsIgnoreCase("Indian");
     }
 
     /**

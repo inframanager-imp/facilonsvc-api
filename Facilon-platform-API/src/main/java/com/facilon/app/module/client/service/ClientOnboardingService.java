@@ -21,6 +21,7 @@ import com.facilon.app.module.client.repository.InvestorTypeCategoryRepository;
 import com.facilon.app.module.client.repository.MarketTypeRepository;
 import com.facilon.app.module.client.repository.IntroInvestorTempRepository;
 import com.facilon.app.module.client.repository.MasterBrokersRepository;
+import com.facilon.app.module.client.repository.MasterCountriesRepository;
 import com.facilon.app.module.client.model.IntroInvestorTemp;
 import com.facilon.app.module.client.model.master.MarketType;
 import com.facilon.app.module.client.model.master.MasterBrokers;
@@ -56,6 +57,7 @@ public class ClientOnboardingService {
     private final InvestorConsentsRepository consentRepository;
     private final IntroInvestorTempRepository introInvestorTempRepository;
     private final MasterBrokersRepository masterBrokersRepository;
+    private final MasterCountriesRepository masterCountriesRepository;
     private final OtpService otpService;
     private final PasswordEncoder passwordEncoder;
     private final ObjectProvider<UserMgmtApiClient> userMgmtApiClientProvider;
@@ -1008,12 +1010,32 @@ public class ClientOnboardingService {
     }
 
     /**
-     * Check if citizenship is India
+     * Check whether the given country reference is India.
+     *
+     * <p>The caller passes a {@code master_countries.id} value (citizenship,
+     * countryOfResidence and incorpCountry are all populated from the country
+     * dropdown, which emits that column). We resolve the row and test a STABLE
+     * attribute — ISO code {@code IN} or name {@code India} — instead of the old
+     * hardcoded {@code id == 1 || 240}. India is id=240 (id 1 was Afghanistan), and
+     * because the Dataverse master sync reassigns numeric ids on every run, matching
+     * by id is unsafe; matching by ISO/name survives re-syncs and the env switch.
      */
-    private boolean isIndiaNationality(Integer citizenshipId) {
-        // TODO: Query nationality/country table
-        // For now, assume 1 = India (update based on actual data)
-        return citizenshipId != null && (citizenshipId == 1 || citizenshipId == 240);
+    private boolean isIndiaNationality(Integer countryId) {
+        if (countryId == null) {
+            return false;
+        }
+        return masterCountriesRepository.findById(countryId)
+                .map(c -> isIndiaText(c.getSsCountry()) || isIndiaText(c.getSsName()))
+                .orElse(false);
+    }
+
+    /** True when the text is India's ISO code ("IN") or India/Indian by name. */
+    private static boolean isIndiaText(String value) {
+        if (value == null) {
+            return false;
+        }
+        String v = value.trim();
+        return v.equalsIgnoreCase("IN") || v.equalsIgnoreCase("India") || v.equalsIgnoreCase("Indian");
     }
 
     /**

@@ -18,6 +18,8 @@ import com.facilon.app.module.client.model.RegistrationSession;
 import com.facilon.app.module.client.model.UserPersonalInformation;
 import com.facilon.app.module.client.repository.InvestorConsentsRepository;
 import com.facilon.app.module.client.repository.InvestorRepository;
+import com.facilon.app.module.client.repository.MasterCountriesRepository;
+import com.facilon.app.module.client.repository.MasterNationalityRepository;
 import com.facilon.app.module.client.repository.OtpVerificationRepository;
 import com.facilon.app.module.client.repository.RegistrationSessionRepository;
 import com.facilon.app.module.client.repository.UserPersonalInformationRepository;
@@ -59,6 +61,8 @@ public class PublicRegistrationService {
     private final InvestorRepository investorRepository;
     private final UserPersonalInformationRepository personalInfoRepository;
     private final InvestorConsentsRepository investorConsentsRepository;
+    private final MasterNationalityRepository nationalityRepository;
+    private final MasterCountriesRepository countriesRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectProvider<GraphEmailService> graphEmailServiceProvider;
     private final ObjectProvider<UserMgmtApiClient> userMgmtClientProvider;
@@ -411,11 +415,12 @@ public class PublicRegistrationService {
 
         Tenant tenant = TenantContextHolder.getContext().getTenant();
 
-        // Check if India and no PAN card
-        final int INDIA_COUNTRY_ID = 1; // Adjust based on your master_country table
-        if (dto.getCountryOfIncorporation().equals(INDIA_COUNTRY_ID) && 
+        // Check if India and no PAN card. Resolve "India" from the master table by
+        // ISO code / name (the country dropdown emits master_countries.id) rather than a
+        // hardcoded id — India is id=240, not 1, and ids are reassigned on every sync.
+        if (isIndiaCountryRef(dto.getCountryOfIncorporation()) &&
             (dto.getHasPanCard() == null || !dto.getHasPanCard())) {
-            
+
             throw new IllegalArgumentException("PAN card is required for entities incorporated in India");
         }
 
@@ -530,8 +535,8 @@ public class PublicRegistrationService {
     }
 
     private String determineInvestorType(IndividualRegistrationDto dto) {
-        boolean isIndianNationality = isIndiaId(dto.getNationality());
-        boolean isIndiaResidence = isIndiaId(dto.getCountryOfResidence());
+        boolean isIndianNationality = isIndiaNationalityRef(dto.getNationality());
+        boolean isIndiaResidence = isIndiaCountryRef(dto.getCountryOfResidence());
         boolean hasPan = Boolean.TRUE.equals(dto.getHasPanCard());
         boolean hasOci = Boolean.TRUE.equals(dto.getHasOciCard());
         Boolean isPio = isIndianNationality ? null : dto.getIsPersonOfIndianOrigin();
@@ -546,8 +551,52 @@ public class PublicRegistrationService {
         }
     }
 
-    private static boolean isIndiaId(Integer id) {
-        return id != null && (id == 1 || id == 240);
+    /**
+     * Resolve whether the selected <b>nationality</b> is India.
+     *
+     * <p>The frontend's nationality dropdown is fed by {@code GET /master/nationalities},
+     * which emits {@code master_nationality.my_row_id} as the option value (see
+     * {@code ClientContentController.getNationalities}). So {@code natRef} is that
+     * {@code my_row_id} (the JPA {@code @Id}), NOT the volatile {@code id} column.
+     *
+     * <p>We resolve the row and test a STABLE attribute (ISO code {@code IN} / name
+     * {@code Indian}) rather than a hardcoded numeric id. The old {@code id == 1 || 240}
+     * check was wrong for nationality (India's row is my_row_id=999 / id=245, never 1 or
+     * 240) and is unstable anyway because the master sync reassigns ids every run.
+     */
+    private boolean isIndiaNationalityRef(Integer natRef) {
+        if (natRef == null) {
+            return false;
+        }
+        return nationalityRepository.findById(natRef.longValue())
+                .map(n -> isIndiaText(n.getSsNationality()) || isIndiaText(n.getSsName()))
+                .orElse(false);
+    }
+
+    /**
+     * Resolve whether the selected <b>country</b> (of residence/incorporation) is India.
+     *
+     * <p>The frontend's country dropdown is fed by {@code GET /master/countries}, which
+     * emits the {@code master_countries.id} column as the option value. So {@code countryRef}
+     * is that {@code id} column; {@code MasterCountriesRepository.findById(Integer)} is a
+     * derived query against it. We test ISO code {@code IN} / name {@code India}.
+     */
+    private boolean isIndiaCountryRef(Integer countryRef) {
+        if (countryRef == null) {
+            return false;
+        }
+        return countriesRepository.findById(countryRef)
+                .map(c -> isIndiaText(c.getSsCountry()) || isIndiaText(c.getSsName()))
+                .orElse(false);
+    }
+
+    /** True when the text is India's ISO code ("IN") or India/Indian by name. */
+    private static boolean isIndiaText(String value) {
+        if (value == null) {
+            return false;
+        }
+        String v = value.trim();
+        return v.equalsIgnoreCase("IN") || v.equalsIgnoreCase("India") || v.equalsIgnoreCase("Indian");
     }
 
 
